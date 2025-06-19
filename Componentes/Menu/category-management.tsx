@@ -1,12 +1,21 @@
 "use client"
 
 import { useState, useEffect } from "react"
+<<<<<<< HEAD:Componentes/Menu/category-management.tsx
 import { MoreHorizontal, Edit, Trash2, Eye, EyeOff } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/Componentes/ui/card"
 import { Badge } from "@/Componentes/ui/badge"
 import { Button } from "@/Componentes/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/Componentes/ui/dropdown-menu"
 import { useToast } from "@/Componentes/ui/use-toast"
+=======
+import { MoreHorizontal, Edit, Eye, EyeOff } from "lucide-react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { useToast } from "@/components/ui/use-toast"
+>>>>>>> db4e1d94f877d6477c03765f5594c62f2c3fc8d0:components/menu/category-management.tsx
 import { createClient } from "@/lib/supabase/client"
 
 interface Category {
@@ -33,18 +42,26 @@ export function CategoryManagement({ searchTerm }: CategoryManagementProps) {
   }, [])
 
   const fetchCategories = async () => {
+    setLoading(true)
     try {
-      const { data, error } = await supabase.from("categories").select("*").order("name")
+      const { data, error } = await supabase.from("categories").select("*")
 
-      if (error) throw error
+      if (error) {
+        console.error("Error fetching categories:", error)
+        throw error
+      }
 
-      setCategories(data || [])
+      // Ordenar por nombre en el cliente
+      const sortedData = data ? data.sort((a: any, b: any) => a.name.localeCompare(b.name)) : []
+      setCategories(sortedData)
     } catch (error: any) {
+      console.error("Error in fetchCategories:", error)
       toast({
         title: "Error",
-        description: "No se pudieron cargar las categorías",
+        description: `No se pudieron cargar las categorías: ${error.message}`,
         variant: "destructive",
       })
+      setCategories([])
     } finally {
       setLoading(false)
     }
@@ -156,13 +173,6 @@ export function CategoryManagement({ searchTerm }: CategoryManagementProps) {
                         Activar
                       </>
                     )}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => deleteCategory(category.id)}
-                    className="text-red-600 focus:text-red-600"
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Eliminar
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>

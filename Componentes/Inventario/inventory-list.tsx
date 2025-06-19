@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+<<<<<<< HEAD:Componentes/Inventario/inventory-list.tsx
 import { MoreHorizontal, Package, AlertTriangle, Edit, Trash2, Plus, Minus } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card"
 import { Badge } from "../ui/badge"
@@ -9,6 +10,16 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../ui/dialog"
 import { Input } from "../ui/input"
 import { Label } from "../ui/label"
+=======
+import { MoreHorizontal, Package, AlertTriangle, Edit, Trash2, Plus, Minus, Pencil } from "lucide-react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+>>>>>>> db4e1d94f877d6477c03765f5594c62f2c3fc8d0:components/inventory/inventory-list.tsx
 import { createClient } from "@/lib/supabase/client"
 
 interface InventoryItem {
@@ -35,6 +46,21 @@ export function InventoryList({ searchTerm }: InventoryListProps) {
   const [adjustmentType, setAdjustmentType] = useState<"add" | "subtract">("add")
   const [adjustmentReason, setAdjustmentReason] = useState("")
   const [items, setItems] = useState<InventoryItem[]>([])
+<<<<<<< HEAD:Componentes/Inventario/inventory-list.tsx
+=======
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [itemToDelete, setItemToDelete] = useState<InventoryItem | null>(null)
+  const [showEditDialog, setShowEditDialog] = useState(false)
+  const [itemToEdit, setItemToEdit] = useState<InventoryItem | null>(null)
+  const [editForm, setEditForm] = useState({
+    name: '',
+    description: '',
+    unit: '',
+    quantity: 0,
+    min_quantity: 0,
+    cost_per_unit: 0
+  })
+>>>>>>> db4e1d94f877d6477c03765f5594c62f2c3fc8d0:components/inventory/inventory-list.tsx
 
   useEffect(() => {
     const fetchInventory = async () => {
@@ -126,11 +152,30 @@ export function InventoryList({ searchTerm }: InventoryListProps) {
                         <Minus className="mr-2 h-4 w-4" />
                         Reducir Stock
                       </DropdownMenuItem>
-                      <DropdownMenuItem>
-                        <Edit className="mr-2 h-4 w-4" />
+                      <DropdownMenuItem
+                        onClick={() => {
+                          setItemToEdit(item)
+                          setEditForm({
+                            name: item.name,
+                            description: item.description || '',
+                            unit: item.unit,
+                            quantity: item.quantity,
+                            min_quantity: item.min_quantity,
+                            cost_per_unit: item.cost_per_unit
+                          })
+                          setShowEditDialog(true)
+                        }}
+                      >
+                        <Pencil className="mr-2 h-4 w-4" />
                         Editar
                       </DropdownMenuItem>
-                      <DropdownMenuItem className="text-red-600 focus:text-red-600">
+                      <DropdownMenuItem
+                        className="text-red-600 focus:text-red-600"
+                        onClick={() => {
+                          setItemToDelete(item)
+                          setShowDeleteDialog(true)
+                        }}
+                      >
                         <Trash2 className="mr-2 h-4 w-4" />
                         Eliminar
                       </DropdownMenuItem>
@@ -234,6 +279,148 @@ export function InventoryList({ searchTerm }: InventoryListProps) {
               </DialogFooter>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>¿Eliminar producto?</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            {itemToDelete && (
+              <p>¿Estás seguro de que deseas eliminar <strong>{itemToDelete.name}</strong> del inventario?</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={async () => {
+                if (!itemToDelete) return
+                const supabase = createClient()
+                const { error } = await supabase
+                  .from("inventory_items")
+                  .delete()
+                  .eq("id", itemToDelete.id)
+                if (error) {
+                  alert("Error al eliminar: " + error.message)
+                } else {
+                  setItems((prev) => prev.filter((i) => i.id !== itemToDelete.id))
+                  setShowDeleteDialog(false)
+                  setItemToDelete(null)
+                }
+              }}
+            >
+              Eliminar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar producto</DialogTitle>
+          </DialogHeader>
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault()
+              if (!itemToEdit) return
+              const supabase = createClient()
+              const { error } = await supabase
+                .from('inventory_items')
+                .update({
+                  name: editForm.name,
+                  description: editForm.description,
+                  unit: editForm.unit,
+                  quantity: editForm.quantity,
+                  min_quantity: editForm.min_quantity,
+                  cost_per_unit: editForm.cost_per_unit
+                })
+                .eq('id', itemToEdit.id)
+              if (error) {
+                alert('Error al actualizar: ' + error.message)
+              } else {
+                setShowEditDialog(false)
+                setItemToEdit(null)
+                // Refrescar lista
+                const { data } = await supabase.from('inventory_items').select('*')
+                setItems(data || [])
+              }
+            }}
+            className="space-y-4"
+          >
+            <div>
+              <label className="block text-sm font-medium">Nombre</label>
+              <input
+                type="text"
+                className="input input-bordered w-full"
+                value={editForm.name}
+                onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium">Descripción</label>
+              <input
+                type="text"
+                className="input input-bordered w-full"
+                value={editForm.description}
+                onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium">Unidad</label>
+              <input
+                type="text"
+                className="input input-bordered w-full"
+                value={editForm.unit}
+                onChange={e => setEditForm(f => ({ ...f, unit: e.target.value }))}
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium">Cantidad</label>
+              <input
+                type="number"
+                className="input input-bordered w-full"
+                value={editForm.quantity}
+                onChange={e => setEditForm(f => ({ ...f, quantity: Number(e.target.value) }))}
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium">Cantidad mínima</label>
+              <input
+                type="number"
+                className="input input-bordered w-full"
+                value={editForm.min_quantity}
+                onChange={e => setEditForm(f => ({ ...f, min_quantity: Number(e.target.value) }))}
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium">Costo por unidad</label>
+              <input
+                type="number"
+                className="input input-bordered w-full"
+                value={editForm.cost_per_unit}
+                onChange={e => setEditForm(f => ({ ...f, cost_per_unit: Number(e.target.value) }))}
+                required
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <button type="button" className="btn" onClick={() => setShowEditDialog(false)}>
+                Cancelar
+              </button>
+              <button type="submit" className="btn btn-primary">
+                Guardar
+              </button>
+            </div>
+          </form>
         </DialogContent>
       </Dialog>
     </>

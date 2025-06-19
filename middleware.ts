@@ -12,9 +12,19 @@ export async function middleware(request: NextRequest) {
     },
   })
 
+  // Verificar si las variables de entorno están configuradas
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    console.warn("Supabase environment variables are not configured in middleware")
+    // Si no están configuradas, permitir el acceso sin autenticación
+    return response
+  }
+
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl,
+    supabaseAnonKey,
     {
       cookies: {
         get(name: string) {
@@ -58,18 +68,23 @@ export async function middleware(request: NextRequest) {
     },
   )
 
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
+  try {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
 
-  // Si no hay sesión y está intentando acceder a rutas protegidas
-  if (!session && request.nextUrl.pathname.startsWith("/dashboard")) {
-    return NextResponse.redirect(new URL("/auth/login", request.url))
-  }
+    // Si no hay sesión y está intentando acceder a rutas protegidas
+    if (!session && request.nextUrl.pathname.startsWith("/dashboard")) {
+      return NextResponse.redirect(new URL("/auth/login", request.url))
+    }
 
-  // Si hay sesión y está en páginas de auth, redirigir al dashboard
-  if (session && (request.nextUrl.pathname.startsWith("/auth") || request.nextUrl.pathname === "/")) {
-    return NextResponse.redirect(new URL("/dashboard", request.url))
+    // Si hay sesión y está en páginas de auth, redirigir al dashboard
+    if (session && (request.nextUrl.pathname.startsWith("/auth") || request.nextUrl.pathname === "/")) {
+      return NextResponse.redirect(new URL("/dashboard", request.url))
+    }
+  } catch (error) {
+    console.error("Error in middleware:", error)
+    // En caso de error, permitir el acceso sin autenticación
   }
 
   return response

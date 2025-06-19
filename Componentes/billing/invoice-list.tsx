@@ -51,28 +51,33 @@ export function InvoiceList({ searchTerm }: InvoiceListProps) {
   }, [])
 
   const fetchInvoices = async () => {
+    setLoading(true)
     try {
       const { data, error } = await supabase
         .from("invoices")
         .select(`
           *,
-          orders (
-            order_number,
-            order_type,
-            tables (name)
-          )
+          customers(name, email)
         `)
-        .order("created_at", { ascending: false })
 
-      if (error) throw error
+      if (error) {
+        console.error("Error fetching invoices:", error)
+        throw error
+      }
 
-      setInvoices(data || [])
+      // Ordenar por fecha de creación (más reciente primero)
+      const sortedData = data ? data.sort((a: any, b: any) => 
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      ) : []
+      setInvoices(sortedData)
     } catch (error: any) {
+      console.error("Error in fetchInvoices:", error)
       toast({
         title: "Error",
-        description: "No se pudieron cargar las facturas",
+        description: `No se pudieron cargar las facturas: ${error.message}`,
         variant: "destructive",
       })
+      setInvoices([])
     } finally {
       setLoading(false)
     }

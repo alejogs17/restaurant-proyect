@@ -62,19 +62,32 @@ export function CreateInvoiceDialog({ open, onOpenChange }: CreateInvoiceDialogP
     try {
       const { data, error } = await supabase
         .from("orders")
-        .select("id, order_number, customer_name, subtotal, tax, discount, total, status")
-        .in("status", ["delivered", "completed"])
-        .order("created_at", { ascending: false })
+        .select("id, order_number, customer_name, subtotal, tax, discount, total, status, created_at")
 
-      if (error) throw error
+      if (error) {
+        console.error("Error fetching orders:", error)
+        throw error
+      }
 
-      setOrders(data || [])
+      // Filtrar por estado en el cliente (delivered y completed)
+      const filteredData = data ? data.filter((order: any) => 
+        ["delivered", "completed"].includes(order.status)
+      ) : []
+
+      // Ordenar por fecha de creación (más reciente primero)
+      const sortedData = filteredData.sort((a: any, b: any) => 
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      )
+
+      setOrders(sortedData)
     } catch (error: any) {
+      console.error("Error in fetchOrders:", error)
       toast({
         title: "Error",
-        description: "No se pudieron cargar los pedidos",
+        description: `No se pudieron cargar los pedidos: ${error.message}`,
         variant: "destructive",
       })
+      setOrders([])
     }
   }
 

@@ -15,13 +15,25 @@ export function createClient() {
         }),
         signOut: async () => ({ error: null }),
         getSession: async () => ({ data: { session: null }, error: null }),
+        getUser: async () => ({ data: { user: null }, error: null }),
         onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
       },
       from: () => ({
-        select: () => ({ data: [], error: null }),
+        select: () => ({
+          data: [],
+          error: null,
+          eq: () => ({ data: [], error: null }),
+          in: () => ({ data: [], error: null }),
+          order: () => ({ data: [], error: null }),
+          limit: () => ({ data: [], error: null }),
+        }),
         insert: () => ({ data: null, error: null }),
         update: () => ({ data: null, error: null }),
         delete: () => ({ data: null, error: null }),
+        eq: () => ({ data: [], error: null }),
+        in: () => ({ data: [], error: null }),
+        order: () => ({ data: [], error: null }),
+        limit: () => ({ data: [], error: null }),
       }),
     } as any
   }

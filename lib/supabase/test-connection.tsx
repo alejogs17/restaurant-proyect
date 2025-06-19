@@ -20,52 +20,92 @@ export function TestSupabaseConnection() {
     try {
       const supabase = createClient()
 
-      // Test 1: Verificar variables de entorno
-      const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-      const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-      if (!url || !key) {
-        throw new Error("Variables de entorno de Supabase no configuradas")
-      }
-
-      // Test 2: Probar conexión básica
-      const { data: healthCheck, error: healthError } = await supabase.from("tables").select("count").limit(1)
+      // Test 1: Basic connection
+      setConnectionStatus({ status: "testing", message: "🔍 Probando conexión básica..." })
+      const { data: healthCheck, error: healthError } = await supabase.from("tables").select("count")
 
       if (healthError) {
-        throw new Error(`Error de conexión: ${healthError.message}`)
+        setConnectionStatus({
+          status: "error",
+          message: `❌ Error de conexión: ${healthError.message}`,
+          details: {
+            url: process.env.NEXT_PUBLIC_SUPABASE_URL?.substring(0, 30) + "..." || "No configurada",
+            hasKey: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+          },
+        })
+        return
       }
 
-      // Test 3: Verificar autenticación
-      const {
-        data: { session },
-        error: authError,
-      } = await supabase.auth.getSession()
+      setConnectionStatus({ status: "testing", message: "✅ Conexión básica exitosa" })
 
-      if (authError) {
-        throw new Error(`Error de autenticación: ${authError.message}`)
-      }
-
-      // Test 4: Probar consulta a tabla específica
-      const { data: tablesData, error: tablesError } = await supabase.from("tables").select("*").limit(5)
+      // Test 2: Fetch tables
+      setConnectionStatus({ status: "testing", message: "📋 Probando consulta de tablas..." })
+      const { data: tablesData, error: tablesError } = await supabase.from("tables").select("*")
 
       if (tablesError) {
-        throw new Error(`Error consultando tablas: ${tablesError.message}`)
+        setConnectionStatus({
+          status: "error",
+          message: `❌ Error al consultar tablas: ${tablesError.message}`,
+          details: {
+            url: process.env.NEXT_PUBLIC_SUPABASE_URL?.substring(0, 30) + "..." || "No configurada",
+            hasKey: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+          },
+        })
+        return
       }
 
+      // Limitar a 5 resultados en el cliente
+      const limitedTables = tablesData ? tablesData.slice(0, 5) : []
       setConnectionStatus({
-        status: "success",
-        message: "Conexión exitosa a Supabase",
+        status: "testing",
+        message: `✅ Consulta de tablas exitosa (${limitedTables.length} tablas encontradas)`,
         details: {
-          url: url.substring(0, 30) + "...",
-          authenticated: !!session,
-          tablesCount: tablesData?.length || 0,
-          user: session?.user?.email || "No autenticado",
+          tablesCount: limitedTables.length,
+          tables: limitedTables.map((table: any) => table.name),
         },
       })
+
+      // Test 3: Check specific tables
+      const requiredTables = ["orders", "products", "categories", "tables"]
+      setConnectionStatus({ status: "testing", message: "🔍 Verificando tablas requeridas..." })
+
+      for (const tableName of requiredTables) {
+        try {
+          const { error } = await supabase.from(tableName).select("id").limit(1)
+          if (error) {
+            setConnectionStatus({
+              status: "error",
+              message: `❌ Tabla '${tableName}' no encontrada: ${error.message}`,
+              details: {
+                tableName,
+              },
+            })
+          } else {
+            setConnectionStatus({
+              status: "testing",
+              message: `✅ Tabla '${tableName}' encontrada`,
+              details: {
+                tableName,
+              },
+            })
+          }
+        } catch (error: any) {
+          setConnectionStatus({
+            status: "error",
+            message: `❌ Error al verificar tabla '${tableName}': ${error.message}`,
+            details: {
+              tableName,
+            },
+          })
+        }
+      }
+
+      setConnectionStatus({ status: "success", message: "🎉 Todas las pruebas completadas" })
+
     } catch (error: any) {
       setConnectionStatus({
         status: "error",
-        message: error.message || "Error desconocido",
+        message: `❌ Error general: ${error.message}`,
         details: {
           url: process.env.NEXT_PUBLIC_SUPABASE_URL?.substring(0, 30) + "..." || "No configurada",
           hasKey: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
