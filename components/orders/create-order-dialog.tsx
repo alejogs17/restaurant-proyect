@@ -78,17 +78,23 @@ export function CreateOrderDialog({ open, onOpenChange }: CreateOrderDialogProps
         .from("tables")
         .select("id, name, status")
         .eq("status", "available")
-        .order("name")
 
-      if (error) throw error
+      if (error) {
+        console.error("Error fetching tables:", error)
+        throw error
+      }
 
-      setTables(data || [])
+      // Ordenar por nombre en el cliente
+      const sortedData = data ? data.sort((a: any, b: any) => a.name.localeCompare(b.name)) : []
+      setTables(sortedData)
     } catch (error: any) {
+      console.error("Error in fetchTables:", error)
       toast({
         title: "Error",
-        description: "No se pudieron cargar las mesas",
+        description: `No se pudieron cargar las mesas: ${error.message}`,
         variant: "destructive",
       })
+      setTables([])
     }
   }
 
@@ -100,20 +106,27 @@ export function CreateOrderDialog({ open, onOpenChange }: CreateOrderDialogProps
           id,
           name,
           price,
-          categories (name)
+          category_id,
+          categories(name)
         `)
         .eq("active", true)
-        .order("name")
 
-      if (error) throw error
+      if (error) {
+        console.error("Error fetching products:", error)
+        throw error
+      }
 
-      setProducts(data || [])
+      // Ordenar por nombre en el cliente
+      const sortedData = data ? data.sort((a: any, b: any) => a.name.localeCompare(b.name)) : []
+      setProducts(sortedData)
     } catch (error: any) {
+      console.error("Error in fetchProducts:", error)
       toast({
         title: "Error",
-        description: "No se pudieron cargar los productos",
+        description: `No se pudieron cargar los productos: ${error.message}`,
         variant: "destructive",
       })
+      setProducts([])
     }
   }
 

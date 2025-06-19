@@ -53,38 +53,42 @@ export function KitchenOrderBoard({ status, autoRefresh }: KitchenOrderBoardProp
   }, [status, autoRefresh])
 
   const fetchOrders = async () => {
+    setLoading(true)
     try {
       const { data, error } = await supabase
         .from("orders")
         .select(`
-          id,
-          order_number,
-          table_id,
-          order_type,
-          customer_name,
-          created_at,
-          notes,
-          tables (name),
+          *,
           order_items (
-            id,
-            quantity,
-            notes,
-            status,
+            *,
             products (name)
-          )
+          ),
+          tables (name)
         `)
-        .eq("status", status)
-        .order("created_at", { ascending: true })
 
-      if (error) throw error
+      if (error) {
+        console.error("Error fetching orders:", error)
+        throw error
+      }
 
-      setOrders(data || [])
+      // Filtrar por estado en el cliente (pending y preparing)
+      const filteredData = data ? data.filter((order: any) => 
+        ["pending", "preparing"].includes(order.status)
+      ) : []
+
+      // Ordenar por fecha de creación (más antiguos primero para la cocina)
+      const sortedData = filteredData.sort((a: any, b: any) => 
+        new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      )
+      setOrders(sortedData)
     } catch (error: any) {
+      console.error("Error in fetchOrders:", error)
       toast({
         title: "Error",
-        description: "No se pudieron cargar los pedidos",
+        description: `No se pudieron cargar los pedidos: ${error.message}`,
         variant: "destructive",
       })
+      setOrders([])
     } finally {
       setLoading(false)
     }

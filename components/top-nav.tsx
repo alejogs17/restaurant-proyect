@@ -25,23 +25,44 @@ export function TopNav() {
 
   useEffect(() => {
     const fetchUser = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      setUser(user)
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        setUser(user)
+      } catch (error) {
+        console.error("Error fetching user:", error)
+        setUser(null)
+      }
     }
 
     fetchUser()
+
+    // Suscribirse a cambios de autenticación
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event: string, session: any) => {
+        setUser(session?.user ?? null)
+      }
+    )
+
+    return () => subscription.unsubscribe()
   }, [supabase.auth])
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut()
-    toast({
-      title: "Signed out",
-      description: "You have been signed out successfully",
-    })
-    router.push("/auth/login")
-    router.refresh()
+    try {
+      await supabase.auth.signOut()
+      toast({
+        title: "Signed out",
+        description: "You have been signed out successfully",
+      })
+      router.push("/auth/login")
+      router.refresh()
+    } catch (error) {
+      console.error("Error signing out:", error)
+      toast({
+        title: "Error",
+        description: "Failed to sign out",
+        variant: "destructive",
+      })
+    }
   }
 
   const getInitials = (email: string) => {

@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { MoreHorizontal, Package, AlertTriangle, Edit, Trash2, Plus, Minus } from "lucide-react"
+import { useState, useEffect } from "react"
+import { MoreHorizontal, Package, AlertTriangle, Edit, Trash2, Plus, Minus, Pencil } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -9,6 +9,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { createClient } from "@/lib/supabase/client"
 
 interface InventoryItem {
   id: number
@@ -33,154 +34,35 @@ export function InventoryList({ searchTerm }: InventoryListProps) {
   const [adjustmentQuantity, setAdjustmentQuantity] = useState("")
   const [adjustmentType, setAdjustmentType] = useState<"add" | "subtract">("add")
   const [adjustmentReason, setAdjustmentReason] = useState("")
+  const [items, setItems] = useState<InventoryItem[]>([])
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [itemToDelete, setItemToDelete] = useState<InventoryItem | null>(null)
+  const [showEditDialog, setShowEditDialog] = useState(false)
+  const [itemToEdit, setItemToEdit] = useState<InventoryItem | null>(null)
+  const [editForm, setEditForm] = useState({
+    name: '',
+    description: '',
+    unit: '',
+    quantity: 0,
+    min_quantity: 0,
+    cost_per_unit: 0
+  })
 
-  // Datos de ejemplo para inventario
-  const items: InventoryItem[] = [
-    {
-      id: 1,
-      name: "Arroz Blanco",
-      description: "Arroz blanco de primera calidad",
-      unit: "kg",
-      quantity: 45,
-      min_quantity: 10,
-      cost_per_unit: 3500,
-      category: "Granos",
-      supplier: "Distribuidora Central",
-      last_updated: "2024-01-15",
-    },
-    {
-      id: 2,
-      name: "Aceite de Girasol",
-      description: "Aceite vegetal para cocinar",
-      unit: "l",
-      quantity: 8,
-      min_quantity: 5,
-      cost_per_unit: 8500,
-      category: "Aceites",
-      supplier: "Distribuidora Central",
-      last_updated: "2024-01-14",
-    },
-    {
-      id: 3,
-      name: "Pollo Entero",
-      description: "Pollo fresco de granja",
-      unit: "kg",
-      quantity: 25,
-      min_quantity: 8,
-      cost_per_unit: 12000,
-      category: "Carnes",
-      supplier: "Carnes Premium",
-      last_updated: "2024-01-14",
-    },
-    {
-      id: 4,
-      name: "Carne de Res",
-      description: "Carne de res para hamburguesas",
-      unit: "kg",
-      quantity: 3,
-      min_quantity: 5,
-      cost_per_unit: 18000,
-      category: "Carnes",
-      supplier: "Carnes Premium",
-      last_updated: "2024-01-13",
-    },
-    {
-      id: 5,
-      name: "Tomate",
-      description: "Tomate fresco para ensaladas",
-      unit: "kg",
-      quantity: 0,
-      min_quantity: 5,
-      cost_per_unit: 4500,
-      category: "Verduras",
-      supplier: "Frutas del Campo",
-      last_updated: "2024-01-12",
-    },
-    {
-      id: 6,
-      name: "Lechuga",
-      description: "Lechuga fresca",
-      unit: "unidad",
-      quantity: 35,
-      min_quantity: 10,
-      cost_per_unit: 2500,
-      category: "Verduras",
-      supplier: "Frutas del Campo",
-      last_updated: "2024-01-13",
-    },
-    {
-      id: 7,
-      name: "Pan para Hamburguesa",
-      description: "Pan artesanal para hamburguesas",
-      unit: "unidad",
-      quantity: 180,
-      min_quantity: 20,
-      cost_per_unit: 1500,
-      category: "Panadería",
-      supplier: "Panadería Artesanal",
-      last_updated: "2024-01-15",
-    },
-    {
-      id: 8,
-      name: "Queso Mozzarella",
-      description: "Queso mozzarella para pizzas",
-      unit: "kg",
-      quantity: 2,
-      min_quantity: 3,
-      cost_per_unit: 15000,
-      category: "Lácteos",
-      supplier: "Lácteos La Pradera",
-      last_updated: "2024-01-11",
-    },
-    {
-      id: 9,
-      name: "Cerveza Nacional",
-      description: "Cerveza nacional en botella",
-      unit: "botella",
-      quantity: 95,
-      min_quantity: 24,
-      cost_per_unit: 3200,
-      category: "Bebidas",
-      supplier: "Bebidas El Dorado",
-      last_updated: "2024-01-11",
-    },
-    {
-      id: 10,
-      name: "Gaseosa Cola",
-      description: "Gaseosa cola 350ml",
-      unit: "lata",
-      quantity: 0,
-      min_quantity: 20,
-      cost_per_unit: 2800,
-      category: "Bebidas",
-      supplier: "Bebidas El Dorado",
-      last_updated: "2024-01-10",
-    },
-    {
-      id: 11,
-      name: "Aguacate",
-      description: "Aguacate fresco",
-      unit: "kg",
-      quantity: 15,
-      min_quantity: 8,
-      cost_per_unit: 12000,
-      category: "Verduras",
-      supplier: "Frutas del Campo",
-      last_updated: "2024-01-13",
-    },
-    {
-      id: 12,
-      name: "Cebolla Blanca",
-      description: "Cebolla blanca fresca",
-      unit: "kg",
-      quantity: 4,
-      min_quantity: 6,
-      cost_per_unit: 3200,
-      category: "Verduras",
-      supplier: "Frutas del Campo",
-      last_updated: "2024-01-12",
-    },
-  ]
+  useEffect(() => {
+    const fetchInventory = async () => {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("inventory_items")
+        .select("*")
+      if (error) {
+        console.error("Error al obtener inventario:", error)
+      } else {
+        setItems(data)
+      }
+    }
+
+    fetchInventory()
+  }, [])
 
   const getStockStatus = (item: InventoryItem) => {
     if (item.quantity <= 0) {
@@ -256,11 +138,30 @@ export function InventoryList({ searchTerm }: InventoryListProps) {
                         <Minus className="mr-2 h-4 w-4" />
                         Reducir Stock
                       </DropdownMenuItem>
-                      <DropdownMenuItem>
-                        <Edit className="mr-2 h-4 w-4" />
+                      <DropdownMenuItem
+                        onClick={() => {
+                          setItemToEdit(item)
+                          setEditForm({
+                            name: item.name,
+                            description: item.description || '',
+                            unit: item.unit,
+                            quantity: item.quantity,
+                            min_quantity: item.min_quantity,
+                            cost_per_unit: item.cost_per_unit
+                          })
+                          setShowEditDialog(true)
+                        }}
+                      >
+                        <Pencil className="mr-2 h-4 w-4" />
                         Editar
                       </DropdownMenuItem>
-                      <DropdownMenuItem className="text-red-600 focus:text-red-600">
+                      <DropdownMenuItem
+                        className="text-red-600 focus:text-red-600"
+                        onClick={() => {
+                          setItemToDelete(item)
+                          setShowDeleteDialog(true)
+                        }}
+                      >
                         <Trash2 className="mr-2 h-4 w-4" />
                         Eliminar
                       </DropdownMenuItem>
@@ -364,6 +265,148 @@ export function InventoryList({ searchTerm }: InventoryListProps) {
               </DialogFooter>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>¿Eliminar producto?</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            {itemToDelete && (
+              <p>¿Estás seguro de que deseas eliminar <strong>{itemToDelete.name}</strong> del inventario?</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={async () => {
+                if (!itemToDelete) return
+                const supabase = createClient()
+                const { error } = await supabase
+                  .from("inventory_items")
+                  .delete()
+                  .eq("id", itemToDelete.id)
+                if (error) {
+                  alert("Error al eliminar: " + error.message)
+                } else {
+                  setItems((prev) => prev.filter((i) => i.id !== itemToDelete.id))
+                  setShowDeleteDialog(false)
+                  setItemToDelete(null)
+                }
+              }}
+            >
+              Eliminar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar producto</DialogTitle>
+          </DialogHeader>
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault()
+              if (!itemToEdit) return
+              const supabase = createClient()
+              const { error } = await supabase
+                .from('inventory_items')
+                .update({
+                  name: editForm.name,
+                  description: editForm.description,
+                  unit: editForm.unit,
+                  quantity: editForm.quantity,
+                  min_quantity: editForm.min_quantity,
+                  cost_per_unit: editForm.cost_per_unit
+                })
+                .eq('id', itemToEdit.id)
+              if (error) {
+                alert('Error al actualizar: ' + error.message)
+              } else {
+                setShowEditDialog(false)
+                setItemToEdit(null)
+                // Refrescar lista
+                const { data } = await supabase.from('inventory_items').select('*')
+                setItems(data || [])
+              }
+            }}
+            className="space-y-4"
+          >
+            <div>
+              <label className="block text-sm font-medium">Nombre</label>
+              <input
+                type="text"
+                className="input input-bordered w-full"
+                value={editForm.name}
+                onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium">Descripción</label>
+              <input
+                type="text"
+                className="input input-bordered w-full"
+                value={editForm.description}
+                onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium">Unidad</label>
+              <input
+                type="text"
+                className="input input-bordered w-full"
+                value={editForm.unit}
+                onChange={e => setEditForm(f => ({ ...f, unit: e.target.value }))}
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium">Cantidad</label>
+              <input
+                type="number"
+                className="input input-bordered w-full"
+                value={editForm.quantity}
+                onChange={e => setEditForm(f => ({ ...f, quantity: Number(e.target.value) }))}
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium">Cantidad mínima</label>
+              <input
+                type="number"
+                className="input input-bordered w-full"
+                value={editForm.min_quantity}
+                onChange={e => setEditForm(f => ({ ...f, min_quantity: Number(e.target.value) }))}
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium">Costo por unidad</label>
+              <input
+                type="number"
+                className="input input-bordered w-full"
+                value={editForm.cost_per_unit}
+                onChange={e => setEditForm(f => ({ ...f, cost_per_unit: Number(e.target.value) }))}
+                required
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <button type="button" className="btn" onClick={() => setShowEditDialog(false)}>
+                Cancelar
+              </button>
+              <button type="submit" className="btn btn-primary">
+                Guardar
+              </button>
+            </div>
+          </form>
         </DialogContent>
       </Dialog>
     </>

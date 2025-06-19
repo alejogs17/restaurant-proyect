@@ -45,32 +45,33 @@ export function PaymentList({ searchTerm }: PaymentListProps) {
   }, [])
 
   const fetchPayments = async () => {
+    setLoading(true)
     try {
       const { data, error } = await supabase
         .from("payments")
         .select(`
           *,
-          orders (
-            order_number,
-            customer_name,
-            tables (name)
-          ),
-          profiles (
-            first_name,
-            last_name
-          )
+          invoices(invoice_number, total_amount)
         `)
-        .order("payment_date", { ascending: false })
 
-      if (error) throw error
+      if (error) {
+        console.error("Error fetching payments:", error)
+        throw error
+      }
 
-      setPayments(data || [])
+      // Ordenar por fecha de pago (más reciente primero)
+      const sortedData = data ? data.sort((a: any, b: any) => 
+        new Date(b.payment_date).getTime() - new Date(a.payment_date).getTime()
+      ) : []
+      setPayments(sortedData)
     } catch (error: any) {
+      console.error("Error in fetchPayments:", error)
       toast({
         title: "Error",
-        description: "No se pudieron cargar los pagos",
+        description: `No se pudieron cargar los pagos: ${error.message}`,
         variant: "destructive",
       })
+      setPayments([])
     } finally {
       setLoading(false)
     }

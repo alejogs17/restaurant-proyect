@@ -69,39 +69,52 @@ export function OrderList({ searchTerm, statusFilter, tabFilter }: OrderListProp
   }, [])
 
   const fetchOrders = async () => {
+    setLoading(true)
     try {
-      setLoading(true)
-
-      // Primero verificamos qué tablas existen
       const { data, error } = await supabase
         .from("orders")
         .select(`
-        id,
-        order_number,
-        table_id,
-        user_id,
-        status,
-        order_type,
-        customer_name,
-        customer_phone,
-        customer_address,
-        subtotal,
-        tax,
-        discount,
-        total,
-        notes,
-        created_at,
-        updated_at
-      `)
-        .order("created_at", { ascending: false })
+          id,
+          order_number,
+          table_id,
+          user_id,
+          status,
+          order_type,
+          customer_name,
+          customer_phone,
+          customer_address,
+          subtotal,
+          tax,
+          discount,
+          total,
+          notes,
+          created_at,
+          updated_at,
+          tables(name),
+          order_items(
+            id,
+            quantity,
+            unit_price,
+            total_price,
+            notes,
+            status,
+            product_id,
+            products (
+              name
+            )
+          )
+        `)
 
       if (error) {
         console.error("Error fetching orders:", error)
         throw error
       }
 
-      // Si no hay datos, mostrar array vacío
-      setOrders(data || [])
+      // Ordenar los datos en el cliente por fecha de creación (más reciente primero)
+      const sortedData = data ? data.sort((a: Order, b: Order) => 
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      ) : []
+      setOrders(sortedData)
     } catch (error: any) {
       console.error("Error in fetchOrders:", error)
       toast({

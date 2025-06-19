@@ -39,18 +39,26 @@ export function TableManagement({ searchTerm, statusFilter }: TableManagementPro
   }, [])
 
   const fetchTables = async () => {
+    setLoading(true)
     try {
-      const { data, error } = await supabase.from("tables").select("*").order("name")
+      const { data, error } = await supabase.from("tables").select("*")
 
-      if (error) throw error
+      if (error) {
+        console.error("Error fetching tables:", error)
+        throw error
+      }
 
-      setTables(data || [])
+      // Ordenar por nombre en el cliente
+      const sortedData = data ? data.sort((a: any, b: any) => a.name.localeCompare(b.name)) : []
+      setTables(sortedData)
     } catch (error: any) {
+      console.error("Error in fetchTables:", error)
       toast({
         title: "Error",
-        description: "No se pudieron cargar las mesas",
+        description: `No se pudieron cargar las mesas: ${error.message}`,
         variant: "destructive",
       })
+      setTables([])
     } finally {
       setLoading(false)
     }
