@@ -2,6 +2,10 @@ import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
 
 export async function middleware(request: NextRequest) {
+  // Comentado temporalmente para testing sin Supabase
+  return NextResponse.next()
+  
+  /*
   let response = NextResponse.next({
     request: {
       headers: request.headers,
@@ -69,6 +73,7 @@ export async function middleware(request: NextRequest) {
   }
 
   return response
+  */
 }
 
 export const config = {

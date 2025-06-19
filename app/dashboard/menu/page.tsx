@@ -2,13 +2,13 @@
 
 import { useState } from "react"
 import { Plus, Search } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ProductManagement } from "@/components/menu/product-management"
-import { CategoryManagement } from "@/components/menu/category-management"
-import { CreateProductDialog } from "@/components/menu/create-product-dialog"
-import { CreateCategoryDialog } from "@/components/menu/create-category-dialog"
+import { Button } from "@/Componentes/ui/button"
+import { Input } from "@/Componentes/ui/input"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/Componentes/ui/tabs"
+import { ProductManagement } from "@/Componentes/Menu/product-management"
+import { CategoryManagement } from "@/Componentes/Menu/category-management"
+import { CreateProductDialog } from "@/Componentes/Menu/create-product-dialog"
+import { CreateCategoryDialog } from "@/Componentes/Menu/create-category-dialog"
 
 export default function MenuPage() {
   const [searchTerm, setSearchTerm] = useState("")

@@ -1,13 +1,13 @@
-import { DashboardStats } from "@/components/dashboard/dashboard-stats"
-import { RecentOrders } from "@/components/dashboard/recent-orders"
-import { TableStatus } from "@/components/dashboard/table-status"
-import { TopSellingItems } from "@/components/dashboard/top-selling-items"
+import { DashboardStats } from "@/Componentes/Panel/dashboard-stats"
+import { RecentOrders } from "@/Componentes/Panel/recent-orders"
+import { TableStatus } from "@/Componentes/Panel/table-status"
+import { TopSellingItems } from "@/Componentes/Panel/top-selling-items"
 
 export default function DashboardPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
+        <h1 className="text-3xl font-bold text-gray-900">Panel</h1>
         <p className="text-gray-600">Resumen general del restaurante</p>
       </div>
 

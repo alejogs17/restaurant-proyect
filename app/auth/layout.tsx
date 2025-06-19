@@ -1,6 +1,6 @@
 import type React from "react"
 import Image from "next/image"
-import { Card, CardContent } from "@/components/ui/card"
+import { Card, CardContent } from "@/Componentes/ui/card"
 
 export default function AuthLayout({
   children,

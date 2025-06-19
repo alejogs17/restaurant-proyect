@@ -6,11 +6,11 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Eye, EyeOff, Mail, Lock, ArrowRight } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Button } from "@/Componentes/ui/button"
+import { Input } from "@/Componentes/ui/input"
+import { Label } from "@/Componentes/ui/label"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/Componentes/ui/card"
+import { Alert, AlertDescription } from "@/Componentes/ui/alert"
 
 export default function DemoLoginPage() {
   const [email, setEmail] = useState("admin@restaurant.com")

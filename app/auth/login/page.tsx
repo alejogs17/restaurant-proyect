@@ -7,10 +7,10 @@ import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Eye, EyeOff, Mail, Lock } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { useToast } from "@/components/ui/use-toast"
+import { Button } from "@/Componentes/ui/button"
+import { Input } from "@/Componentes/ui/input"
+import { Label } from "@/Componentes/ui/label"
+import { useToast } from "@/Componentes/ui/use-toast"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -47,7 +47,7 @@ export default function LoginPage() {
       })
 
       if (error) {
-        throw error
+        throw "Credenciales inválidas. Verifica tu email y contraseña."
       }
 
       if (data.session) {

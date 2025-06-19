@@ -1,9 +1,9 @@
 "use client"
 
 import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+import { Button } from "@/Componentes/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/Componentes/ui/card"
+import { Badge } from "@/Componentes/ui/badge"
 import { CheckCircle, XCircle, AlertCircle } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 

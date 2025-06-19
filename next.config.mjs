@@ -4,11 +4,11 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
   typescript: {
-    ignoreBuildErrors: true,
+    // Remove ignoreBuildErrors to ensure proper type checking
   },
   images: {
     unoptimized: true,
-  },
+  }
 }
 
-export default nextConfig
+export default nextConfig;

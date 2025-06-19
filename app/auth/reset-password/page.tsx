@@ -6,10 +6,10 @@ import { useState } from "react"
 import Link from "next/link"
 import { ArrowLeft, Mail, CheckCircle } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { useToast } from "@/components/ui/use-toast"
+import { Button } from "@/Componentes/ui/button"
+import { Input } from "@/Componentes/ui/input"
+import { Label } from "@/Componentes/ui/label"
+import { useToast } from "@/Componentes/ui/use-toast"
 
 export default function ResetPasswordPage() {
   const [email, setEmail] = useState("")
