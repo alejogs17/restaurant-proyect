@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useCallback } from "react"
 import { Plus, Search } from "lucide-react"
 import { Button } from "@/Componentes/ui/button"
 import { Input } from "@/Componentes/ui/input"
@@ -14,6 +14,12 @@ export default function PurchasesPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [showCreatePurchase, setShowCreatePurchase] = useState(false)
   const [showCreateSupplier, setShowCreateSupplier] = useState(false)
+  const [key, setKey] = useState(0) // Add key to force re-render
+
+  // Callback to refresh the list
+  const handlePurchaseCreated = useCallback(() => {
+    setKey(prev => prev + 1) // Force re-render of PurchaseList
+  }, [])
 
   return (
     <div className="space-y-6">
@@ -51,7 +57,7 @@ export default function PurchasesPage() {
         </TabsList>
 
         <TabsContent value="purchases">
-          <PurchaseList searchTerm={searchTerm} />
+          <PurchaseList key={key} searchTerm={searchTerm} />
         </TabsContent>
 
         <TabsContent value="suppliers">
@@ -59,7 +65,11 @@ export default function PurchasesPage() {
         </TabsContent>
       </Tabs>
 
-      <CreatePurchaseDialog open={showCreatePurchase} onOpenChange={setShowCreatePurchase} />
+      <CreatePurchaseDialog 
+        open={showCreatePurchase} 
+        onOpenChange={setShowCreatePurchase} 
+        onSuccess={handlePurchaseCreated}
+      />
 
       <CreateSupplierDialog open={showCreateSupplier} onOpenChange={setShowCreateSupplier} />
     </div>

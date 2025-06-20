@@ -45,11 +45,12 @@ interface PurchaseItem {
 interface CreatePurchaseDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  onSuccess?: () => void
 }
 
-export function CreatePurchaseDialog({ open, onOpenChange }: CreatePurchaseDialogProps) {
+export function CreatePurchaseDialog({ open, onOpenChange, onSuccess }: CreatePurchaseDialogProps) {
   const [supplierId, setSupplierId] = useState("")
-  const [purchaseDate, setPurchaseDate] = useState("")
+  const [purchaseDate, setPurchaseDate] = useState(new Date().toISOString().split("T")[0])
   const [notes, setNotes] = useState("")
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([])
@@ -62,8 +63,11 @@ export function CreatePurchaseDialog({ open, onOpenChange }: CreatePurchaseDialo
     if (open) {
       fetchSuppliers()
       fetchInventoryItems()
-      // Set default date to today
+      // Reset form when dialog opens
+      setSupplierId("")
       setPurchaseDate(new Date().toISOString().split("T")[0])
+      setNotes("")
+      setPurchaseItems([])
     }
   }, [open])
 
@@ -184,6 +188,16 @@ export function CreatePurchaseDialog({ open, onOpenChange }: CreatePurchaseDialo
     e.preventDefault()
     setLoading(true)
 
+    if (!supplierId) {
+      toast({
+        title: "Error",
+        description: "Debe seleccionar un proveedor",
+        variant: "destructive",
+      })
+      setLoading(false)
+      return
+    }
+
     if (purchaseItems.length === 0) {
       toast({
         title: "Error",
@@ -196,11 +210,15 @@ export function CreatePurchaseDialog({ open, onOpenChange }: CreatePurchaseDialo
 
     try {
       // Get current user
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
 
-      if (!user) throw new Error("Usuario no autenticado")
+      if (sessionError) {
+        throw new Error("Error al verificar la sesión")
+      }
+
+      if (!session?.user) {
+        throw new Error("Usuario no autenticado")
+      }
 
       const totalAmount = calculateTotal()
 
@@ -209,17 +227,19 @@ export function CreatePurchaseDialog({ open, onOpenChange }: CreatePurchaseDialo
         .from("purchases")
         .insert([
           {
-            supplier_id: Number.parseInt(supplierId),
-            user_id: user.id,
+            supplier_id: parseInt(supplierId),
+            user_id: session.user.id,
             purchase_date: purchaseDate,
             total_amount: totalAmount,
             notes: notes || null,
+            status: "pending"
           },
         ])
         .select()
         .single()
 
       if (purchaseError) throw purchaseError
+      if (!purchaseData) throw new Error("No se pudo crear la compra")
 
       // Create purchase items
       const purchaseItemsData = purchaseItems.map((item) => ({
@@ -230,39 +250,33 @@ export function CreatePurchaseDialog({ open, onOpenChange }: CreatePurchaseDialo
         total_price: item.total_price,
       }))
 
-      const { error: itemsError } = await supabase.from("purchase_items").insert(purchaseItemsData)
+      const { error: itemsError } = await supabase
+        .from("purchase_items")
+        .insert(purchaseItemsData)
 
       if (itemsError) throw itemsError
 
-      // Update inventory quantities
-      for (const item of purchaseItems) {
-        const { error: inventoryError } = await supabase.rpc("update_inventory_quantity", {
-          item_id: item.inventory_item_id,
-          quantity_change: item.quantity,
-        })
-
-        if (inventoryError) {
-          console.error("Error updating inventory:", inventoryError)
-          // Continue with other items even if one fails
-        }
-      }
-
       toast({
         title: "Compra creada",
-        description: `La compra ha sido registrada correctamente`,
+        description: `La compra #${purchaseData.id} ha sido registrada correctamente`,
       })
 
       // Reset form
       setSupplierId("")
-      setPurchaseDate("")
+      setPurchaseDate(new Date().toISOString().split("T")[0])
       setNotes("")
       setPurchaseItems([])
+      
+      // Close dialog and refresh list
       onOpenChange(false)
-      window.location.reload()
+      if (onSuccess) {
+        onSuccess()
+      }
     } catch (error: any) {
+      console.error("Error creating purchase:", error)
       toast({
         title: "Error",
-        description: "No se pudo crear la compra",
+        description: error.message || "No se pudo crear la compra",
         variant: "destructive",
       })
     } finally {
@@ -301,7 +315,12 @@ export function CreatePurchaseDialog({ open, onOpenChange }: CreatePurchaseDialo
 
               <div className="grid gap-2">
                 <Label>Fecha de Compra</Label>
-                <Input type="date" value={purchaseDate} onChange={(e) => setPurchaseDate(e.target.value)} required />
+                <Input 
+                  type="date" 
+                  value={purchaseDate} 
+                  onChange={(e) => setPurchaseDate(e.target.value)} 
+                  required 
+                />
               </div>
             </div>
 

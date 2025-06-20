@@ -8,11 +8,29 @@ CREATE TABLE IF NOT EXISTS profiles (
   id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
   first_name TEXT,
   last_name TEXT,
+  email TEXT,
   avatar_url TEXT,
+  phone TEXT,
   role TEXT NOT NULL CHECK (role IN ('admin', 'waiter', 'cashier', 'chef')),
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive')),
+  total_orders INTEGER DEFAULT 0,
+  total_sales DECIMAL(10, 2) DEFAULT 0,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Add email column if it doesn't exist
+DO $$ 
+BEGIN 
+  IF NOT EXISTS (
+    SELECT 1 
+    FROM information_schema.columns 
+    WHERE table_name = 'profiles' 
+    AND column_name = 'email'
+  ) THEN
+    ALTER TABLE profiles ADD COLUMN email TEXT;
+  END IF;
+END $$;
 
 -- Create tables table to manage restaurant tables
 CREATE TABLE IF NOT EXISTS tables (
@@ -50,7 +68,7 @@ CREATE TABLE IF NOT EXISTS products (
 -- Create inventory_items table
 CREATE TABLE IF NOT EXISTS inventory_items (
   id SERIAL PRIMARY KEY,
-  name TEXT NOT NULL,
+  name TEXT NOT NULL UNIQUE,
   description TEXT,
   unit TEXT NOT NULL,
   quantity DECIMAL(10, 2) NOT NULL DEFAULT 0,
@@ -63,7 +81,7 @@ CREATE TABLE IF NOT EXISTS inventory_items (
 -- Create suppliers table
 CREATE TABLE IF NOT EXISTS suppliers (
   id SERIAL PRIMARY KEY,
-  name TEXT NOT NULL,
+  name TEXT NOT NULL UNIQUE,
   contact_name TEXT,
   phone TEXT,
   email TEXT,
@@ -160,16 +178,19 @@ CREATE TABLE IF NOT EXISTS activity_logs (
 -- Profiles table policies
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Users can view their own profile"
+-- Permitir a todos los usuarios autenticados ver todos los perfiles
+CREATE POLICY "Usuarios autenticados pueden ver perfiles"
   ON profiles FOR SELECT
+  USING (auth.role() = 'authenticated');
+
+-- Permitir a los usuarios ver y actualizar su propio perfil
+CREATE POLICY "Usuarios pueden ver y actualizar su propio perfil"
+  ON profiles FOR ALL
   USING (auth.uid() = id);
 
-CREATE POLICY "Users can update their own profile"
-  ON profiles FOR UPDATE
-  USING (auth.uid() = id);
-
-CREATE POLICY "Admins can view all profiles"
-  ON profiles FOR SELECT
+-- Permitir a los administradores gestionar todos los perfiles
+CREATE POLICY "Administradores pueden gestionar perfiles"
+  ON profiles FOR ALL
   USING (
     EXISTS (
       SELECT 1 FROM profiles
@@ -177,23 +198,10 @@ CREATE POLICY "Admins can view all profiles"
     )
   );
 
-CREATE POLICY "Admins can insert profiles"
+-- Permitir la creación inicial de perfiles
+CREATE POLICY "Permitir creación inicial de perfiles"
   ON profiles FOR INSERT
-  WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM profiles
-      WHERE profiles.id = auth.uid() AND profiles.role = 'admin'
-    )
-  );
-
-CREATE POLICY "Admins can update profiles"
-  ON profiles FOR UPDATE
-  USING (
-    EXISTS (
-      SELECT 1 FROM profiles
-      WHERE profiles.id = auth.uid() AND profiles.role = 'admin'
-    )
-  );
+  WITH CHECK (true);
 
 -- Create function to handle new user signup
 CREATE OR REPLACE FUNCTION public.handle_new_user()
@@ -246,3 +254,23 @@ VALUES
   ('Pasta Carbonara', 'Spaghetti with creamy sauce, pancetta, and parmesan', 16.99, 2, true),
   ('Cheesecake', 'New York style cheesecake with berry compote', 7.99, 3, true),
   ('Iced Tea', 'Freshly brewed and sweetened', 3.99, 4, true);
+
+-- Insert sample users data
+INSERT INTO auth.users (id, email, created_at)
+VALUES 
+  ('mg-001', 'maria.gonzalez@restaurante.com', NOW()),
+  ('cr-002', 'carlos.rodriguez@restaurante.com', NOW()),
+  ('am-003', 'ana.martinez@restaurante.com', NOW()),
+  ('lh-004', 'luis.hernandez@restaurante.com', NOW()),
+  ('ps-005', 'patricia.silva@restaurante.com', NOW())
+ON CONFLICT (id) DO NOTHING;
+
+-- Insert sample profiles data
+INSERT INTO profiles (id, first_name, last_name, role, status, phone, created_at, last_sign_in_at, total_orders, total_sales)
+VALUES 
+  ('mg-001', 'Maria', 'González', 'admin', 'active', '+57 300 123 4567', NOW(), '2024-01-15 10:30:00', 0, 0),
+  ('cr-002', 'Carlos', 'Rodriguez', 'waiter', 'active', '+57 310 987 6543', NOW(), '2024-01-15 14:20:00', 156, 8450000),
+  ('am-003', 'Ana', 'Martinez', 'cashier', 'active', '+57 320 555 1234', NOW(), '2024-01-15 16:45:00', 0, 0),
+  ('lh-004', 'Luis', 'Hernández', 'chef', 'active', '+57 315 444 7890', NOW(), '2024-01-15 08:15:00', 0, 0),
+  ('ps-005', 'Patricia', 'Silva', 'waiter', 'inactive', '+57 325 666 3210', NOW(), '2024-01-10 12:00:00', 45, 2180000)
+ON CONFLICT (id) DO NOTHING;

@@ -1,26 +1,15 @@
 "use client"
 
 import { useState, useEffect } from "react"
-<<<<<<< HEAD:Componentes/Inventario/inventory-list.tsx
-import { MoreHorizontal, Package, AlertTriangle, Edit, Trash2, Plus, Minus } from "lucide-react"
+import { MoreHorizontal, Package, AlertTriangle, Edit, Trash2, Plus, Minus, Pencil } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card"
 import { Badge } from "../ui/badge"
-import { Button } from "../ui/button"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../ui/dropdown-menu"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../ui/dialog"
 import { Input } from "../ui/input"
 import { Label } from "../ui/label"
-=======
-import { MoreHorizontal, Package, AlertTriangle, Edit, Trash2, Plus, Minus, Pencil } from "lucide-react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
->>>>>>> db4e1d94f877d6477c03765f5594c62f2c3fc8d0:components/inventory/inventory-list.tsx
 import { createClient } from "@/lib/supabase/client"
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "../ui/dropdown-menu"
+import { Button } from "../ui/button"
 
 interface InventoryItem {
   id: number
@@ -40,41 +29,22 @@ interface InventoryListProps {
 }
 
 export function InventoryList({ searchTerm }: InventoryListProps) {
-  const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null)
-  const [showAdjustDialog, setShowAdjustDialog] = useState(false)
-  const [adjustmentQuantity, setAdjustmentQuantity] = useState("")
   const [adjustmentType, setAdjustmentType] = useState<"add" | "subtract">("add")
+  const [adjustmentQuantity, setAdjustmentQuantity] = useState<number | string>("")
   const [adjustmentReason, setAdjustmentReason] = useState("")
   const [items, setItems] = useState<InventoryItem[]>([])
-<<<<<<< HEAD:Componentes/Inventario/inventory-list.tsx
-=======
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [itemToDelete, setItemToDelete] = useState<InventoryItem | null>(null)
   const [showEditDialog, setShowEditDialog] = useState(false)
   const [itemToEdit, setItemToEdit] = useState<InventoryItem | null>(null)
-  const [editForm, setEditForm] = useState({
-    name: '',
-    description: '',
-    unit: '',
-    quantity: 0,
-    min_quantity: 0,
-    cost_per_unit: 0
-  })
->>>>>>> db4e1d94f877d6477c03765f5594c62f2c3fc8d0:components/inventory/inventory-list.tsx
+  const [editForm, setEditForm] = useState<Partial<InventoryItem>>({})
 
   useEffect(() => {
     const fetchInventory = async () => {
-      const supabase = createClient();
-      const { data, error } = await supabase
-        .from("inventory_items")
-        .select("*")
-      if (error) {
-        console.error("Error al obtener inventario:", error)
-      } else {
-        setItems(data)
-      }
+      const supabase = createClient()
+      const { data } = await supabase.from("inventory_items").select("*")
+      setItems(data || [])
     }
-
     fetchInventory()
   }, [])
 
@@ -118,7 +88,7 @@ export function InventoryList({ searchTerm }: InventoryListProps) {
                       {item.name}
                     </CardTitle>
                     <div className="flex items-center gap-2 mt-1">
-                      <Badge className={`${stockStatus.color} hover:${stockStatus.color} text-white`}>
+                      <Badge className={`${stockStatus.color} text-white`}>
                         {stockStatus.label}
                       </Badge>
                       {stockStatus.status === "low" && <AlertTriangle className="h-4 w-4 text-amber-500" />}
@@ -134,9 +104,9 @@ export function InventoryList({ searchTerm }: InventoryListProps) {
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem
                         onClick={() => {
-                          setSelectedItem(item)
+                          setItemToEdit(item)
                           setAdjustmentType("add")
-                          setShowAdjustDialog(true)
+                          setShowEditDialog(true)
                         }}
                       >
                         <Plus className="mr-2 h-4 w-4" />
@@ -144,9 +114,9 @@ export function InventoryList({ searchTerm }: InventoryListProps) {
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() => {
-                          setSelectedItem(item)
+                          setItemToEdit(item)
                           setAdjustmentType("subtract")
-                          setShowAdjustDialog(true)
+                          setShowEditDialog(true)
                         }}
                       >
                         <Minus className="mr-2 h-4 w-4" />
@@ -220,105 +190,6 @@ export function InventoryList({ searchTerm }: InventoryListProps) {
           )
         })}
       </div>
-
-      <Dialog open={showAdjustDialog} onOpenChange={setShowAdjustDialog}>
-        <DialogContent>
-          {selectedItem && (
-            <>
-              <DialogHeader>
-                <DialogTitle>
-                  {adjustmentType === "add" ? "Agregar" : "Reducir"} Stock - {selectedItem.name}
-                </DialogTitle>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid gap-2">
-                  <Label>
-                    Stock Actual: {selectedItem.quantity} {selectedItem.unit}
-                  </Label>
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="quantity">Cantidad a {adjustmentType === "add" ? "agregar" : "reducir"}</Label>
-                  <Input
-                    id="quantity"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    placeholder="0"
-                    value={adjustmentQuantity}
-                    onChange={(e) => setAdjustmentQuantity(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="reason">Motivo del ajuste</Label>
-                  <Input
-                    id="reason"
-                    placeholder="Compra, merma, corrección, etc."
-                    value={adjustmentReason}
-                    onChange={(e) => setAdjustmentReason(e.target.value)}
-                  />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setShowAdjustDialog(false)}>
-                  Cancelar
-                </Button>
-                <Button
-                  onClick={() => {
-                    // Aquí iría la lógica para actualizar el stock
-                    setShowAdjustDialog(false)
-                    setAdjustmentQuantity("")
-                    setAdjustmentReason("")
-                  }}
-                  className={
-                    adjustmentType === "add" ? "bg-green-500 hover:bg-green-600" : "bg-red-500 hover:bg-red-600"
-                  }
-                >
-                  {adjustmentType === "add" ? "Agregar" : "Reducir"} Stock
-                </Button>
-              </DialogFooter>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>¿Eliminar producto?</DialogTitle>
-          </DialogHeader>
-          <div className="py-4">
-            {itemToDelete && (
-              <p>¿Estás seguro de que deseas eliminar <strong>{itemToDelete.name}</strong> del inventario?</p>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
-              Cancelar
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={async () => {
-                if (!itemToDelete) return
-                const supabase = createClient()
-                const { error } = await supabase
-                  .from("inventory_items")
-                  .delete()
-                  .eq("id", itemToDelete.id)
-                if (error) {
-                  alert("Error al eliminar: " + error.message)
-                } else {
-                  setItems((prev) => prev.filter((i) => i.id !== itemToDelete.id))
-                  setShowDeleteDialog(false)
-                  setItemToDelete(null)
-                }
-              }}
-            >
-              Eliminar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
         <DialogContent>
@@ -421,6 +292,44 @@ export function InventoryList({ searchTerm }: InventoryListProps) {
               </button>
             </div>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>¿Eliminar producto?</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            {itemToDelete && (
+              <p>¿Estás seguro de que deseas eliminar <strong>{itemToDelete.name}</strong> del inventario?</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={async () => {
+                if (!itemToDelete) return
+                const supabase = createClient()
+                const { error } = await supabase
+                  .from("inventory_items")
+                  .delete()
+                  .eq("id", itemToDelete.id)
+                if (error) {
+                  alert("Error al eliminar: " + error.message)
+                } else {
+                  setItems((prev) => prev.filter((i) => i.id !== itemToDelete.id))
+                  setShowDeleteDialog(false)
+                  setItemToDelete(null)
+                }
+              }}
+            >
+              Eliminar
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </>

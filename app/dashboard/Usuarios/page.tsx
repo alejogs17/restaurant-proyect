@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Plus, Search, MoreHorizontal, Edit, Trash2, UserCheck, UserX } from "lucide-react"
 import { Button } from "@/Componentes/ui/button"
 import { Input } from "@/Componentes/ui/input"
@@ -19,86 +19,168 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { CreateUserDialog } from "@/Componentes/Usuarios/create-user-dialog"
 import { EditUserDialog } from "@/Componentes/Usuarios/edit-user-dialog"
 import { UserStatsCards } from "@/Componentes/Usuarios/user-stats-cards"
+import { createClient } from "@/lib/supabase/client"
+import { useToast } from "@/Componentes/ui/use-toast"
+import { User as SupabaseUser, Session, AuthChangeEvent } from '@supabase/supabase-js'
+
+interface AuthUser extends SupabaseUser {
+  user_metadata: {
+    status?: string
+  }
+}
+
+interface Profile {
+  id: string
+  first_name: string
+  last_name: string
+  email: string
+  phone?: string
+  role: string
+  status: string
+  created_at: string
+  avatar_url?: string
+  total_orders?: number
+  total_sales?: number
+}
+
+interface User {
+  id: string
+  first_name: string
+  last_name: string
+  email: string
+  role: string
+  status: string
+  phone?: string
+  last_sign_in_at?: string
+  created_at: string
+  avatar_url?: string
+  total_orders?: number
+  total_sales?: number
+}
 
 export default function UsersPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedRole, setSelectedRole] = useState("all")
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
-  const [editingUser, setEditingUser] = useState<any>(null)
+  const [editingUser, setEditingUser] = useState<User | null>(null)
+  const [users, setUsers] = useState<User[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSessionLoading, setIsSessionLoading] = useState(true)
+  const supabase = createClient()
+  const { toast } = useToast()
+  const [session, setSession] = useState<Session | null>(null)
 
-  // Datos de ejemplo para usuarios
-  const users = [
-    {
-      id: 1,
-      firstName: "María",
-      lastName: "González",
-      email: "maria.gonzalez@restaurante.com",
-      role: "admin",
-      status: "active",
-      lastLogin: "2024-01-15T10:30:00",
-      createdAt: "2023-06-15T09:00:00",
-      avatar: null,
-      phone: "+57 300 123 4567",
-      totalOrders: 0,
-      totalSales: 0,
-    },
-    {
-      id: 2,
-      firstName: "Carlos",
-      lastName: "Rodríguez",
-      email: "carlos.rodriguez@restaurante.com",
-      role: "waiter",
-      status: "active",
-      lastLogin: "2024-01-15T14:20:00",
-      createdAt: "2023-08-20T10:30:00",
-      avatar: null,
-      phone: "+57 310 987 6543",
-      totalOrders: 156,
-      totalSales: 8450000,
-    },
-    {
-      id: 3,
-      firstName: "Ana",
-      lastName: "Martínez",
-      email: "ana.martinez@restaurante.com",
-      role: "cashier",
-      status: "active",
-      lastLogin: "2024-01-15T16:45:00",
-      createdAt: "2023-09-10T11:15:00",
-      avatar: null,
-      phone: "+57 320 555 1234",
-      totalOrders: 89,
-      totalSales: 4230000,
-    },
-    {
-      id: 4,
-      firstName: "Luis",
-      lastName: "Hernández",
-      email: "luis.hernandez@restaurante.com",
-      role: "chef",
-      status: "active",
-      lastLogin: "2024-01-15T08:15:00",
-      createdAt: "2023-07-05T08:00:00",
-      avatar: null,
-      phone: "+57 315 444 7890",
-      totalOrders: 0,
-      totalSales: 0,
-    },
-    {
-      id: 5,
-      firstName: "Patricia",
-      lastName: "Silva",
-      email: "patricia.silva@restaurante.com",
-      role: "waiter",
-      status: "inactive",
-      lastLogin: "2024-01-10T12:00:00",
-      createdAt: "2023-11-20T14:30:00",
-      avatar: null,
-      phone: "+57 325 666 3210",
-      totalOrders: 45,
-      totalSales: 2180000,
-    },
-  ]
+  useEffect(() => {
+    console.log('Checking session...')
+    setIsSessionLoading(true)
+    // Check for an active session when the component mounts
+    supabase.auth.getSession().then(({ data: { session: currentSession } }: { data: { session: Session | null } }) => {
+      console.log('Session status:', currentSession ? 'Active' : 'No session')
+      setSession(currentSession)
+      setIsSessionLoading(false)
+      if (currentSession) {
+        fetchUsers()
+      } else {
+        setIsLoading(false)
+        // Don't show error toast here as middleware should handle redirect
+        console.log('No active session, middleware should redirect')
+      }
+    }).catch((error: Error) => {
+      console.error('Error checking session:', error)
+      setIsSessionLoading(false)
+      setIsLoading(false)
+      // Don't show error toast here as middleware should handle redirect
+      console.log('Session check error, middleware should redirect')
+    })
+
+    // Set up auth state listener
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event: AuthChangeEvent, newSession: Session | null) => {
+      console.log('Auth state changed:', event, newSession ? 'Active' : 'No session')
+      setSession(newSession)
+      if (newSession) {
+        fetchUsers()
+      } else {
+        // Session ended, clear users and stop loading
+        setUsers([])
+        setIsLoading(false)
+        console.log('Session ended, clearing data')
+      }
+    })
+
+    return () => subscription.unsubscribe()
+  }, [])
+
+  const fetchUsers = async () => {
+    try {
+      console.log('Fetching users...')
+      setIsLoading(true)
+      
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        console.log('No session available for fetching users')
+        setIsLoading(false)
+        return
+      }
+
+      // 1. Fetch all profiles from the 'profiles' table.
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('created_at', { ascending: false })
+
+      if (profilesError) {
+        console.error('Error fetching profiles:', profilesError.message)
+        toast({
+          title: "Error",
+          description: "No se pudieron cargar los perfiles: " + profilesError.message,
+          variant: "destructive",
+        })
+        setIsLoading(false)
+        return
+      }
+
+      if (!profiles || profiles.length === 0) {
+        console.log('No profiles found in the database.')
+        setUsers([])
+        setIsLoading(false)
+        return
+      }
+      
+      
+
+      console.log('Profiles fetched:', profiles.length)
+
+      const formattedUsers: User[] = profiles.map((profile: Profile): User => ({
+        id: profile.id,
+        first_name: profile.first_name,
+        last_name: profile.last_name,
+        email: profile.email || 'No disponible', // Use email from profile
+        role: profile.role,
+        status: profile.status,
+        phone: profile.phone,
+        last_sign_in_at: undefined, // This info is in auth.users, hard to get securely on client
+        created_at: profile.created_at,
+        avatar_url: profile.avatar_url,
+        total_orders: profile.total_orders,
+        total_sales: profile.total_sales,
+      }))
+
+      console.log('Formatted users:', formattedUsers)
+      setUsers(formattedUsers)
+      
+    } catch (error) {
+      console.error('An unexpected error occurred in fetchUsers:', error)
+      toast({
+        title: "Error Inesperado",
+        description: "Ocurrió un error al cargar los usuarios.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   const getRoleColor = (role: string) => {
     switch (role) {
@@ -148,11 +230,12 @@ export default function UsersPage() {
 
   const formatDateTime = (dateString: string) => {
     return new Date(dateString).toLocaleString("es-CO", {
-      year: "numeric",
-      month: "short",
       day: "numeric",
+      month: "short",
+      year: "numeric",
       hour: "2-digit",
       minute: "2-digit",
+      hour12: true
     })
   }
 
@@ -162,21 +245,40 @@ export default function UsersPage() {
 
   const filteredUsers = users.filter((user) => {
     const matchesSearch =
-      user.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase())
+      (user.first_name ? user.first_name.toLowerCase() : '').includes(searchTerm.toLowerCase()) ||
+      (user.last_name ? user.last_name.toLowerCase() : '').includes(searchTerm.toLowerCase()) ||
+      (user.email ? user.email.toLowerCase() : '').includes(searchTerm.toLowerCase());
+    const matchesRole = selectedRole === "all" || user.role === selectedRole;
+    return matchesSearch && matchesRole;
+  });
 
-    const matchesRole = selectedRole === "all" || user.role === selectedRole
+  // Add loading state display
+  if (isSessionLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto"></div>
+          <p className="text-lg">Verificando sesión...</p>
+        </div>
+      </div>
+    )
+  }
 
-    return matchesSearch && matchesRole
-  })
+  if (!session && process.env.NODE_ENV !== 'development') { // Allow mock data in dev
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center space-y-4">
+          <p className="text-lg text-red-600">Por favor, inicie sesión para acceder a esta página</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Gestión de Usuarios</h1>
-          <p className="text-gray-600">Administra los usuarios del sistema</p>
+          <h1 className="text-3xl font-bold text-gray-900">Lista de Usuarios ({users.length})</h1>
         </div>
         <Button onClick={() => setIsCreateDialogOpen(true)}>
           <Plus className="h-4 w-4 mr-2" />
@@ -193,28 +295,26 @@ export default function UsersPage() {
           <CardTitle>Filtros</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex gap-4">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar usuarios..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-8"
-                />
-              </div>
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1 relative">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar usuarios..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-8"
+              />
             </div>
             <select
+              className="p-2 border rounded-md"
               value={selectedRole}
               onChange={(e) => setSelectedRole(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="all">Todos los roles</option>
-              <option value="admin">Administrador</option>
-              <option value="waiter">Mesero</option>
-              <option value="cashier">Cajero</option>
-              <option value="chef">Chef</option>
+              <option value="admin">Administradores</option>
+              <option value="waiter">Meseros</option>
+              <option value="cashier">Cajeros</option>
+              <option value="chef">Chefs</option>
             </select>
           </div>
         </CardContent>
@@ -222,10 +322,7 @@ export default function UsersPage() {
 
       {/* Users Table */}
       <Card>
-        <CardHeader>
-          <CardTitle>Lista de Usuarios ({filteredUsers.length})</CardTitle>
-        </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           <Table>
             <TableHeader>
               <TableRow>
@@ -238,98 +335,128 @@ export default function UsersPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredUsers.map((user) => (
-                <TableRow key={user.id}>
-                  <TableCell>
-                    <div className="flex items-center space-x-3">
-                      <Avatar>
-                        <AvatarImage src={user.avatar || ""} />
-                        <AvatarFallback>{getInitials(user.firstName, user.lastName)}</AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <div className="font-medium">
-                          {user.firstName} {user.lastName}
-                        </div>
-                        <div className="text-sm text-muted-foreground">{user.email}</div>
-                        <div className="text-xs text-muted-foreground">{user.phone}</div>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className={getRoleColor(user.role)}>
-                      {getRoleText(user.role)}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className={getStatusColor(user.status)}>
-                      {getStatusText(user.status)}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="text-sm">{formatDateTime(user.lastLogin)}</div>
-                  </TableCell>
-                  <TableCell>
-                    {user.role === "waiter" ? (
-                      <div className="text-sm">
-                        <div>{user.totalOrders} órdenes</div>
-                        <div className="text-green-600 font-medium">{formatCurrency(user.totalSales)}</div>
-                      </div>
-                    ) : (
-                      <span className="text-muted-foreground">N/A</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => setEditingUser(user)}>
-                          <Edit className="h-4 w-4 mr-2" />
-                          Editar
-                        </DropdownMenuItem>
-                        <DropdownMenuItem>
-                          {user.status === "active" ? (
-                            <>
-                              <UserX className="h-4 w-4 mr-2" />
-                              Desactivar
-                            </>
-                          ) : (
-                            <>
-                              <UserCheck className="h-4 w-4 mr-2" />
-                              Activar
-                            </>
-                          )}
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem className="text-red-600">
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Eliminar
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+              {isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center py-4">
+                    Cargando usuarios...
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : users.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center py-4">
+                    No se encontraron usuarios
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredUsers.map((user) => (
+                  <TableRow key={user.id}>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-sm font-medium">
+                          {getInitials(user.first_name, user.last_name)}
+                        </div>
+                        <div>
+                          <p className="font-medium">{`${user.first_name} ${user.last_name}`}</p>
+                          <p className="text-sm text-muted-foreground">{user.email}</p>
+                          {user.phone && (
+                            <p className="text-sm text-muted-foreground">{user.phone}</p>
+                          )}
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={getRoleColor(user.role)}>{getRoleText(user.role)}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={getStatusColor(user.status)}>{getStatusText(user.status)}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      {user.last_sign_in_at ? formatDateTime(user.last_sign_in_at) : "Nunca"}
+                    </TableCell>
+                    <TableCell>
+                      {user.total_orders ? (
+                        <div>
+                          <p>{user.total_orders} órdenes</p>
+                          <p className="text-sm text-green-600">{formatCurrency(user.total_sales || 0)}</p>
+                        </div>
+                      ) : (
+                        "N/A"
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => setEditingUser(user)}>
+                            <Edit className="mr-2 h-4 w-4" />
+                            Editar
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={async () => {
+                              try {
+                                const newStatus = user.status === 'active' ? 'inactive' : 'active'
+                                const { error } = await supabase
+                                  .from('profiles')
+                                  .update({ status: newStatus })
+                                  .eq('id', user.id)
+
+                                if (error) throw error
+
+                                toast({
+                                  title: "Estado actualizado",
+                                  description: `Usuario ${newStatus === 'active' ? 'activado' : 'desactivado'} correctamente`,
+                                })
+
+                                fetchUsers()
+                              } catch (error) {
+                                console.error('Error updating status:', error)
+                                toast({
+                                  title: "Error",
+                                  description: "No se pudo actualizar el estado del usuario",
+                                  variant: "destructive",
+                                })
+                              }
+                            }}
+                          >
+                            {user.status === 'active' ? (
+                              <>
+                                <UserX className="mr-2 h-4 w-4" />
+                                Desactivar
+                              </>
+                            ) : (
+                              <>
+                                <UserCheck className="mr-2 h-4 w-4" />
+                                Activar
+                              </>
+                            )}
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
 
-      {/* Dialogs */}
-      <CreateUserDialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen} />
+      <CreateUserDialog
+        open={isCreateDialogOpen}
+        onOpenChange={setIsCreateDialogOpen}
+        onUserCreated={fetchUsers}
+      />
 
-      {editingUser && (
-        <EditUserDialog
-          user={editingUser}
-          open={!!editingUser}
-          onOpenChange={(open) => !open && setEditingUser(null)}
-        />
-      )}
+      <EditUserDialog
+        user={editingUser}
+        open={!!editingUser}
+        onOpenChange={(open) => !open && setEditingUser(null)}
+        onUserEdited={fetchUsers}
+      />
     </div>
   )
 }

@@ -110,6 +110,7 @@ export function PurchasesReport({ dateRange, startDate, endDate }: PurchasesRepo
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold">Reporte de Compras</h2>
         <ExportDropdown
+          reportTitle="Reporte de Compras"
           data={{
             resumen: {
               totalGastado: purchasesData.totalSpent,

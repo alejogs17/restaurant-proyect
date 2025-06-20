@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import {
   BarChart3,
   ChefHat,
@@ -16,12 +16,38 @@ import {
   Users,
 } from "lucide-react"
 import { Button } from "@/Componentes/ui/button"
+import { createClient } from "@/lib/supabase/client"
+import { useToast } from "@/Componentes/ui/use-toast"
 
 export function AppSidebar() {
   const pathname = usePathname()
+  const router = useRouter()
+  const supabase = createClient()
+  const { toast } = useToast()
 
   const isActive = (path: string) => {
     return pathname === path || pathname.startsWith(`${path}/`)
+  }
+
+  const handleSignOut = async () => {
+    try {
+      const { error } = await supabase.auth.signOut()
+      if (error) {
+        throw error
+      }
+      toast({
+        title: "Sesión cerrada",
+        description: "Has cerrado sesión correctamente",
+      })
+      router.push("/auth/login")
+    } catch (error) {
+      console.error("Error signing out:", error)
+      toast({
+        title: "Error",
+        description: "No se pudo cerrar la sesión",
+        variant: "destructive",
+      })
+    }
   }
 
   return (
@@ -127,9 +153,9 @@ export function AppSidebar() {
         </nav>
       </div>
       <div className="p-4 border-t">
-        <Button variant="outline" className="w-full justify-start">
+        <Button variant="outline" className="w-full justify-start" onClick={handleSignOut}>
           <LogOut className="mr-2 h-4 w-4" />
-          Sign out
+          Cerrar sesión
         </Button>
       </div>
     </div>
