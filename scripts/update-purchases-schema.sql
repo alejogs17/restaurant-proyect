@@ -1,5 +1,8 @@
 -- Actualizar esquema para compras y proveedores
 
+-- Agregar columna de estado a la tabla de compras
+ALTER TABLE purchases ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'completed' CHECK (status IN ('completed', 'pending', 'cancelled'));
+
 -- Insertar datos de ejemplo para proveedores
 INSERT INTO suppliers (name, contact_name, phone, email, address)
 VALUES 
@@ -11,16 +14,37 @@ VALUES
 ON CONFLICT (name) DO NOTHING;
 
 -- Función para actualizar cantidad de inventario
-CREATE OR REPLACE FUNCTION update_inventory_quantity(item_id INTEGER, quantity_change DECIMAL)
+-- Primero, eliminamos la función existente para forzar la actualización de la caché del esquema
+DROP FUNCTION IF EXISTS public.update_inventory_quantity(INTEGER, DECIMAL);
+
+CREATE OR REPLACE FUNCTION update_inventory_quantity(p_item_id INTEGER, p_quantity_change DECIMAL)
 RETURNS VOID AS $$
+DECLARE
+  item_exists BOOLEAN;
 BEGIN
+  -- Verificar si el item existe
+  SELECT EXISTS (
+    SELECT 1 FROM inventory_items WHERE id = p_item_id
+  ) INTO item_exists;
+
+  IF NOT item_exists THEN
+    RAISE EXCEPTION 'Item with ID % not found', p_item_id;
+  END IF;
+
   UPDATE inventory_items 
   SET 
-    quantity = quantity + quantity_change,
+    quantity = quantity + p_quantity_change,
     updated_at = NOW()
-  WHERE id = item_id;
+  WHERE id = p_item_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Failed to update inventory for item %', p_item_id;
+  END IF;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Conceder permisos de ejecución a los usuarios autenticados
+GRANT EXECUTE ON FUNCTION public.update_inventory_quantity(INTEGER, DECIMAL) TO authenticated;
 
 -- Insertar datos de ejemplo para compras
 INSERT INTO purchases (supplier_id, user_id, purchase_date, total_amount, notes)

@@ -2,10 +2,6 @@ import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
 
 export async function middleware(request: NextRequest) {
-  // Comentado temporalmente para testing sin Supabase
-  return NextResponse.next()
-  
-  /*
   let response = NextResponse.next({
     request: {
       headers: request.headers,
@@ -75,7 +71,9 @@ export async function middleware(request: NextRequest) {
 
     // Si no hay sesión y está intentando acceder a rutas protegidas
     if (!session && request.nextUrl.pathname.startsWith("/dashboard")) {
-      return NextResponse.redirect(new URL("/auth/login", request.url))
+      const redirectUrl = new URL("/auth/login", request.url)
+      redirectUrl.searchParams.set("next", request.nextUrl.pathname)
+      return NextResponse.redirect(redirectUrl)
     }
 
     // Si hay sesión y está en páginas de auth, redirigir al dashboard
@@ -84,11 +82,11 @@ export async function middleware(request: NextRequest) {
     }
   } catch (error) {
     console.error("Error in middleware:", error)
-    // En caso de error, permitir el acceso sin autenticación
+    // En caso de error, redirigir al login
+    return NextResponse.redirect(new URL("/auth/login", request.url))
   }
 
   return response
-  */
 }
 
 export const config = {

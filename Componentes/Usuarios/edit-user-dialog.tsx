@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useEffect } from "react"
 import { Button } from "@/Componentes/ui/button"
 import {
@@ -16,14 +15,17 @@ import { Input } from "@/Componentes/ui/input"
 import { Label } from "@/Componentes/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/Componentes/ui/select"
 import { useToast } from "@/Componentes/ui/use-toast"
+import { createClient } from "@/lib/supabase/client"
+import type { User } from "@/app/types"
 
 interface EditUserDialogProps {
-  user: any
+  user: User | null
   open: boolean
   onOpenChange: (open: boolean) => void
+  onUserEdited?: () => void
 }
 
-export function EditUserDialog({ user, open, onOpenChange }: EditUserDialogProps) {
+export function EditUserDialog({ user, open, onOpenChange, onUserEdited }: EditUserDialogProps) {
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -34,12 +36,13 @@ export function EditUserDialog({ user, open, onOpenChange }: EditUserDialogProps
   })
   const [isLoading, setIsLoading] = useState(false)
   const { toast } = useToast()
+  const supabase = createClient()
 
   useEffect(() => {
     if (user) {
       setFormData({
-        firstName: user.firstName || "",
-        lastName: user.lastName || "",
+        firstName: user.first_name || "",
+        lastName: user.last_name || "",
         email: user.email || "",
         phone: user.phone || "",
         role: user.role || "",
@@ -53,21 +56,40 @@ export function EditUserDialog({ user, open, onOpenChange }: EditUserDialogProps
     setIsLoading(true)
 
     try {
+      if (!user) throw new Error("No se ha seleccionado un usuario")
+
       // Validaciones
-      if (!formData.firstName || !formData.lastName || !formData.email || !formData.role) {
+      if (!formData.firstName || !formData.lastName || !formData.role) {
         throw new Error("Todos los campos obligatorios deben ser completados")
       }
 
-      // Simular actualización de usuario
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+      // Update profile data in 'profiles' table
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .update({
+          first_name: formData.firstName,
+          last_name: formData.lastName,
+          phone: formData.phone,
+          role: formData.role,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', user.id)
+        .select()
+        .single()
+
+      if (profileError) {
+        throw new Error(`Error al actualizar el perfil: ${profileError.message}`)
+      }
 
       toast({
-        title: "Usuario Actualizado",
-        description: `Los datos de ${formData.firstName} ${formData.lastName} han sido actualizados`,
+        title: "Usuario actualizado",
+        description: "Los datos del usuario han sido actualizados.",
       })
 
+      onUserEdited?.()
       onOpenChange(false)
     } catch (error) {
+      console.error('Error updating user:', error)
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "No se pudo actualizar el usuario",
@@ -87,38 +109,46 @@ export function EditUserDialog({ user, open, onOpenChange }: EditUserDialogProps
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="firstName">Nombre *</Label>
-                <Input
-                  id="firstName"
-                  value={formData.firstName}
-                  onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-                  placeholder="Nombre"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="lastName">Apellido *</Label>
-                <Input
-                  id="lastName"
-                  value={formData.lastName}
-                  onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-                  placeholder="Apellido"
-                  required
-                />
-              </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="firstName" className="text-right">
+                Nombre
+              </Label>
+              <Input
+                id="firstName"
+                value={formData.firstName}
+                onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                className="col-span-3"
+              />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="email">Email *</Label>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="lastName" className="text-right">
+                Apellido
+              </Label>
+              <Input
+                id="lastName"
+                value={formData.lastName}
+                onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="email" className="text-right">
+                Email
+              </Label>
               <Input
                 id="email"
                 type="email"
                 value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                placeholder="usuario@restaurante.com"
-                required
+                className="col-span-3"
+                disabled
               />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <div className="col-start-2 col-span-3">
+                <p className="text-xs text-muted-foreground">
+                  El email no se puede cambiar desde aquí por razones de seguridad.
+                </p>
+              </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="phone">Teléfono</Label>

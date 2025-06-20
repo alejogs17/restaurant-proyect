@@ -1,21 +1,12 @@
 "use client"
 
 import { useState, useEffect } from "react"
-<<<<<<< HEAD:Componentes/Menu/category-management.tsx
-import { MoreHorizontal, Edit, Trash2, Eye, EyeOff } from "lucide-react"
+import { MoreHorizontal, Edit, Eye, EyeOff } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/Componentes/ui/card"
 import { Badge } from "@/Componentes/ui/badge"
 import { Button } from "@/Componentes/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/Componentes/ui/dropdown-menu"
 import { useToast } from "@/Componentes/ui/use-toast"
-=======
-import { MoreHorizontal, Edit, Eye, EyeOff } from "lucide-react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { useToast } from "@/components/ui/use-toast"
->>>>>>> db4e1d94f877d6477c03765f5594c62f2c3fc8d0:components/menu/category-management.tsx
 import { createClient } from "@/lib/supabase/client"
 
 interface Category {
@@ -88,27 +79,6 @@ export function CategoryManagement({ searchTerm }: CategoryManagementProps) {
       toast({
         title: "Error",
         description: "No se pudo actualizar el estado de la categoría",
-        variant: "destructive",
-      })
-    }
-  }
-
-  const deleteCategory = async (categoryId: number) => {
-    try {
-      const { error } = await supabase.from("categories").delete().eq("id", categoryId)
-
-      if (error) throw error
-
-      setCategories(categories.filter((category) => category.id !== categoryId))
-
-      toast({
-        title: "Categoría eliminada",
-        description: "La categoría ha sido eliminada correctamente",
-      })
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: "No se pudo eliminar la categoría",
         variant: "destructive",
       })
     }

@@ -1,10 +1,11 @@
 "use client"
 
-import { Users, UserCheck, UserX, Crown } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/Componentes/ui/card"
+import { Users, UserCheck, UserX, Shield } from "lucide-react"
+import type { User } from "@/app/types"
 
 interface UserStatsCardsProps {
-  users: any[]
+  users: User[]
 }
 
 export function UserStatsCards({ users }: UserStatsCardsProps) {
@@ -38,7 +39,7 @@ export function UserStatsCards({ users }: UserStatsCardsProps) {
     {
       title: "Administradores",
       value: adminUsers,
-      icon: Crown,
+      icon: Shield,
       color: "text-purple-600",
       bgColor: "bg-purple-100",
     },

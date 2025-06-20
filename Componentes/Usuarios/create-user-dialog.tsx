@@ -16,13 +16,16 @@ import { Input } from "@/Componentes/ui/input"
 import { Label } from "@/Componentes/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/Componentes/ui/select"
 import { useToast } from "@/Componentes/ui/use-toast"
+import { createClient } from "@/lib/supabase/client"
+import type { User } from "@/app/types"
 
 interface CreateUserDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  onUserCreated: () => void
 }
 
-export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) {
+export function CreateUserDialog({ open, onOpenChange, onUserCreated }: CreateUserDialogProps) {
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -34,12 +37,26 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
   })
   const [isLoading, setIsLoading] = useState(false)
   const { toast } = useToast()
+  const supabase = createClient()
+  const [lastSignupAttempt, setLastSignupAttempt] = useState<Date | null>(null)
+  const SIGNUP_COOLDOWN = 48000 // 48 seconds in milliseconds
+  const [error, setError] = useState<string | null>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
+    setError(null)
 
     try {
+      // Check for rate limiting
+      if (lastSignupAttempt) {
+        const timeSinceLastAttempt = Date.now() - lastSignupAttempt.getTime()
+        if (timeSinceLastAttempt < SIGNUP_COOLDOWN) {
+          const remainingTime = Math.ceil((SIGNUP_COOLDOWN - timeSinceLastAttempt) / 1000)
+          throw new Error(`Por favor espera ${remainingTime} segundos antes de intentar crear otro usuario`)
+        }
+      }
+
       // Validaciones
       if (!formData.firstName || !formData.lastName || !formData.email || !formData.role) {
         throw new Error("Todos los campos obligatorios deben ser completados")
@@ -53,32 +70,70 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
         throw new Error("La contraseña debe tener al menos 6 caracteres")
       }
 
-      // Simular creación de usuario
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+      // Update last signup attempt timestamp
+      setLastSignupAttempt(new Date())
+
+      // 1. Crear la cuenta de autenticación
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
+        options: {
+          data: {
+            full_name: `${formData.firstName} ${formData.lastName}`,
+          }
+        }
+      })
+
+      if (authError) {
+        console.error('Auth error:', {
+          message: authError.message,
+          status: authError.status,
+          name: authError.name
+        })
+        if (authError.message.includes('48 seconds')) {
+          throw new Error("Por favor espera 48 segundos antes de intentar crear otro usuario")
+        }
+        if (authError.message.includes('email')) {
+          throw new Error("El correo electrónico ya está registrado o no es válido")
+        }
+        throw new Error(authError.message || "Error al crear la cuenta de usuario")
+      }
+
+      if (!authData?.user?.id) {
+        throw new Error("No se pudo crear la cuenta de usuario")
+      }
+
+      // 2. Crear el perfil del usuario
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .insert({
+          id: authData.user.id,
+          first_name: formData.firstName,
+          last_name: formData.lastName,
+          phone: formData.phone || null,
+          role: formData.role,
+          status: 'active'
+        })
+
+      if (profileError) {
+        console.error('Profile creation error:', profileError)
+        
+        // Si falla la creación del perfil, no intentamos borrar el usuario
+        // ya que no tenemos acceso a admin.deleteUser desde el cliente
+        throw new Error("Error al crear el perfil del usuario: " + profileError.message)
+      }
 
       toast({
-        title: "Usuario Creado",
-        description: `${formData.firstName} ${formData.lastName} ha sido agregado al sistema`,
+        title: "Usuario creado",
+        description: "El usuario ha sido creado exitosamente",
       })
 
-      // Resetear formulario
-      setFormData({
-        firstName: "",
-        lastName: "",
-        email: "",
-        phone: "",
-        role: "",
-        password: "",
-        confirmPassword: "",
-      })
-
+      onUserCreated?.()
       onOpenChange(false)
+      
     } catch (error) {
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "No se pudo crear el usuario",
-        variant: "destructive",
-      })
+      console.error('Error in handleSubmit:', error)
+      setError(error instanceof Error ? error.message : "Error al crear el usuario")
     } finally {
       setIsLoading(false)
     }
@@ -89,8 +144,17 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Crear Nuevo Usuario</DialogTitle>
-          <DialogDescription>Completa la información para crear un nuevo usuario en el sistema.</DialogDescription>
+          <DialogDescription>
+            Complete los datos del nuevo usuario. Todos los campos son obligatorios.
+          </DialogDescription>
         </DialogHeader>
+
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-800 rounded-md p-3 mb-4">
+            {error}
+          </div>
+        )}
+
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-2 gap-4">
