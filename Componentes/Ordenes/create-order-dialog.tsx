@@ -1,8 +1,6 @@
 "use client"
 
-import type React from "react"
-
-import { useState, useEffect } from "react"
+import React, { useState, useEffect, ChangeEvent, FormEvent } from "react"
 import { Plus, Minus, X } from "lucide-react"
 import { Button } from "@/Componentes/ui/button"
 import {
@@ -85,7 +83,7 @@ export function CreateOrderDialog({ open, onOpenChange }: CreateOrderDialogProps
       }
 
       // Ordenar por nombre en el cliente
-      const sortedData = data ? data.sort((a: any, b: any) => a.name.localeCompare(b.name)) : []
+      const sortedData = data ? data.sort((a: Table, b: Table) => a.name.localeCompare(b.name)) : []
       setTables(sortedData)
     } catch (error: any) {
       console.error("Error in fetchTables:", error)
@@ -117,7 +115,7 @@ export function CreateOrderDialog({ open, onOpenChange }: CreateOrderDialogProps
       }
 
       // Ordenar por nombre en el cliente
-      const sortedData = data ? data.sort((a: any, b: any) => a.name.localeCompare(b.name)) : []
+      const sortedData = data ? data.sort((a: Product, b: Product) => a.name.localeCompare(b.name)) : []
       setProducts(sortedData)
     } catch (error: any) {
       console.error("Error in fetchProducts:", error)
@@ -205,7 +203,7 @@ export function CreateOrderDialog({ open, onOpenChange }: CreateOrderDialogProps
     return `ORD-${timestamp}`
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setLoading(true)
 
@@ -316,7 +314,7 @@ export function CreateOrderDialog({ open, onOpenChange }: CreateOrderDialogProps
             <div className="grid gap-4">
               <div className="grid gap-2">
                 <Label>Tipo de Pedido</Label>
-                <Select value={orderType} onValueChange={(value: any) => setOrderType(value)}>
+                <Select value={orderType} onValueChange={(value: "dine_in" | "takeout" | "delivery") => setOrderType(value)}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -352,7 +350,7 @@ export function CreateOrderDialog({ open, onOpenChange }: CreateOrderDialogProps
                     <Label>Nombre del Cliente</Label>
                     <Input
                       value={customerName}
-                      onChange={(e) => setCustomerName(e.target.value)}
+                      onChange={(e: ChangeEvent<HTMLInputElement>) => setCustomerName(e.target.value)}
                       placeholder="Nombre completo"
                       required
                     />
@@ -361,7 +359,7 @@ export function CreateOrderDialog({ open, onOpenChange }: CreateOrderDialogProps
                     <Label>Teléfono</Label>
                     <Input
                       value={customerPhone}
-                      onChange={(e) => setCustomerPhone(e.target.value)}
+                      onChange={(e: ChangeEvent<HTMLInputElement>) => setCustomerPhone(e.target.value)}
                       placeholder="Número de teléfono"
                       required
                     />
@@ -374,7 +372,7 @@ export function CreateOrderDialog({ open, onOpenChange }: CreateOrderDialogProps
                   <Label>Dirección de Entrega</Label>
                   <Textarea
                     value={customerAddress}
-                    onChange={(e) => setCustomerAddress(e.target.value)}
+                    onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setCustomerAddress(e.target.value)}
                     placeholder="Dirección completa"
                     required
                   />
@@ -400,7 +398,7 @@ export function CreateOrderDialog({ open, onOpenChange }: CreateOrderDialogProps
                             {product.categories.name}
                           </Badge>
                         </div>
-                        <p className="font-bold text-orange-600">{formatCurrency(product.price)}</p>
+                        <p className="font-semibold">{formatCurrency(product.price)}</p>
                       </div>
                     </CardContent>
                   </Card>
@@ -412,14 +410,16 @@ export function CreateOrderDialog({ open, onOpenChange }: CreateOrderDialogProps
             {orderItems.length > 0 && (
               <div className="grid gap-4">
                 <Label>Productos en el Pedido</Label>
-                <div className="space-y-2">
+                <div className="grid gap-2">
                   {orderItems.map((item) => (
                     <Card key={item.product_id}>
                       <CardContent className="p-3">
                         <div className="flex justify-between items-center">
                           <div className="flex-1">
                             <p className="font-medium">{item.product_name}</p>
-                            <p className="text-sm text-muted-foreground">{formatCurrency(item.unit_price)} c/u</p>
+                            <p className="text-sm text-muted-foreground">
+                              {formatCurrency(item.unit_price)} x {item.quantity}
+                            </p>
                           </div>
                           <div className="flex items-center gap-2">
                             <Button
@@ -428,7 +428,7 @@ export function CreateOrderDialog({ open, onOpenChange }: CreateOrderDialogProps
                               size="sm"
                               onClick={() => updateItemQuantity(item.product_id, item.quantity - 1)}
                             >
-                              <Minus className="h-3 w-3" />
+                              <Minus className="h-4 w-4" />
                             </Button>
                             <span className="w-8 text-center">{item.quantity}</span>
                             <Button
@@ -437,19 +437,20 @@ export function CreateOrderDialog({ open, onOpenChange }: CreateOrderDialogProps
                               size="sm"
                               onClick={() => updateItemQuantity(item.product_id, item.quantity + 1)}
                             >
-                              <Plus className="h-3 w-3" />
+                              <Plus className="h-4 w-4" />
                             </Button>
                             <Button
                               type="button"
-                              variant="ghost"
+                              variant="outline"
                               size="sm"
                               onClick={() => removeItem(item.product_id)}
-                              className="text-red-600 hover:text-red-700"
                             >
-                              <X className="h-3 w-3" />
+                              <X className="h-4 w-4" />
                             </Button>
                           </div>
-                          <p className="font-bold w-20 text-right">{formatCurrency(item.total_price)}</p>
+                          <p className="font-semibold w-20 text-right">
+                            {formatCurrency(item.total_price)}
+                          </p>
                         </div>
                       </CardContent>
                     </Card>
@@ -458,46 +459,42 @@ export function CreateOrderDialog({ open, onOpenChange }: CreateOrderDialogProps
               </div>
             )}
 
-            {/* Order Summary */}
-            {orderItems.length > 0 && (
-              <div className="border-t pt-4">
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span>Subtotal:</span>
-                    <span>{formatCurrency(subtotal)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Impuestos (19%):</span>
-                    <span>{formatCurrency(tax)}</span>
-                  </div>
-                  <div className="flex justify-between font-bold text-lg">
-                    <span>Total:</span>
-                    <span className="text-orange-600">{formatCurrency(total)}</span>
-                  </div>
-                </div>
-              </div>
-            )}
-
             {/* Notes */}
             <div className="grid gap-2">
-              <Label>Notas del Pedido</Label>
+              <Label>Notas Adicionales</Label>
               <Textarea
                 value={notes}
-                onChange={(e) => setNotes(e.target.value)}
+                onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setNotes(e.target.value)}
                 placeholder="Instrucciones especiales, alergias, etc."
-                rows={2}
+                rows={3}
               />
             </div>
+
+            {/* Order Summary */}
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <h3 className="font-semibold mb-2">Resumen del Pedido</h3>
+              <div className="space-y-1">
+                <div className="flex justify-between">
+                  <span>Subtotal:</span>
+                  <span>{formatCurrency(subtotal)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>IVA (19%):</span>
+                  <span>{formatCurrency(tax)}</span>
+                </div>
+                <div className="flex justify-between font-semibold border-t pt-1">
+                  <span>Total:</span>
+                  <span>{formatCurrency(total)}</span>
+                </div>
+              </div>
+            </div>
           </div>
+
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
-            <Button
-              type="submit"
-              disabled={loading || orderItems.length === 0}
-              className="bg-orange-500 hover:bg-orange-600"
-            >
+            <Button type="submit" disabled={loading || orderItems.length === 0}>
               {loading ? "Creando..." : "Crear Pedido"}
             </Button>
           </DialogFooter>

@@ -55,26 +55,25 @@ export function PaymentDialog({ open, onOpenChange, order }: PaymentDialogProps)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!order) return setLoading(false)
+
     setLoading(true)
 
-    if (!order) {
-      toast({
-        title: "Error",
-        description: "No hay pedido seleccionado",
-        variant: "destructive",
-      })
-      setLoading(false)
-      return
-    }
-
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-
+      const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error("Usuario no autenticado")
+      
+      const { data: orderData, error: orderFetchError } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('id', order.id)
+        .single();
 
-      // Create payment record
+      if (orderFetchError || !orderData) {
+        throw new Error('No se pudo obtener la información completa del pedido.');
+      }
+
+      // 1. Create payment record
       const { error: paymentError } = await supabase.from("payments").insert([
         {
           order_id: order.id,
@@ -88,7 +87,24 @@ export function PaymentDialog({ open, onOpenChange, order }: PaymentDialogProps)
 
       if (paymentError) throw paymentError
 
-      // Update order status to completed
+      // 2. Create invoice record
+      const { error: invoiceError } = await supabase.from("invoices").insert([
+        {
+          invoice_number: `INV-${orderData.order_number}`,
+          order_id: orderData.id,
+          customer_name: orderData.customer_name || 'Cliente General',
+          subtotal: orderData.subtotal,
+          tax: orderData.tax,
+          discount: orderData.discount,
+          total: orderData.total,
+          status: 'paid',
+          due_date: new Date().toISOString().split('T')[0],
+        }
+      ]);
+
+      if (invoiceError) throw invoiceError;
+      
+      // 3. Update order status to completed
       const { error: orderError } = await supabase
         .from("orders")
         .update({ status: "completed", updated_at: new Date().toISOString() })
@@ -97,21 +113,19 @@ export function PaymentDialog({ open, onOpenChange, order }: PaymentDialogProps)
       if (orderError) throw orderError
 
       toast({
-        title: "Pago registrado",
-        description: `El pago de ${formatCurrency(Number.parseFloat(amount))} ha sido registrado correctamente`,
+        title: "Pago y Factura Creados",
+        description: `El pago de ${formatCurrency(Number.parseFloat(amount))} ha sido registrado y la factura fue creada.`,
       })
 
-      // Reset form
-      setPaymentMethod("")
-      setAmount("")
-      setReferenceNumber("")
-      setNotes("")
+      // Reset form and close dialog
       onOpenChange(false)
+      
+      // Recargar la página para mostrar los cambios
       window.location.reload()
     } catch (error: any) {
       toast({
         title: "Error",
-        description: "No se pudo registrar el pago",
+        description: `No se pudo procesar el pago: ${error.message}`,
         variant: "destructive",
       })
     } finally {
@@ -131,13 +145,14 @@ export function PaymentDialog({ open, onOpenChange, order }: PaymentDialogProps)
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[300px] flex flex-col max-h-[90vh]">
         <DialogHeader>
           <DialogTitle>Procesar Pago</DialogTitle>
           <DialogDescription>Registra el pago para el pedido {order.order_number}</DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit}>
-          <div className="grid gap-4 py-4">
+        
+        <div className="flex-1 overflow-y-auto p-1">
+          <form id="payment-form" onSubmit={handleSubmit} className="grid gap-4 py-4">
             <div className="bg-orange-50 p-3 rounded-lg">
               <div className="flex justify-between items-center">
                 <span className="font-medium">Total a pagar:</span>
@@ -215,20 +230,22 @@ export function PaymentDialog({ open, onOpenChange, order }: PaymentDialogProps)
                 </div>
               </div>
             )}
-          </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancelar
-            </Button>
-            <Button
-              type="submit"
-              disabled={loading || !paymentMethod || !amount}
-              className="bg-green-500 hover:bg-green-600"
-            >
-              {loading ? "Procesando..." : "Procesar Pago"}
-            </Button>
-          </DialogFooter>
-        </form>
+          </form>
+        </div>
+
+        <DialogFooter className="border-t pt-4">
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            Cancelar
+          </Button>
+          <Button
+            type="submit"
+            form="payment-form"
+            disabled={loading || !paymentMethod || !amount}
+            className="bg-green-500 hover:bg-green-600"
+          >
+            {loading ? "Procesando..." : "Procesar Pago"}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )

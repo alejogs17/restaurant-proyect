@@ -22,40 +22,12 @@ import { UserStatsCards } from "@/Componentes/Usuarios/user-stats-cards"
 import { createClient } from "@/lib/supabase/client"
 import { useToast } from "@/Componentes/ui/use-toast"
 import { User as SupabaseUser, Session, AuthChangeEvent } from '@supabase/supabase-js'
+import { User, Profile } from "@/app/types"
 
 interface AuthUser extends SupabaseUser {
   user_metadata: {
     status?: string
   }
-}
-
-interface Profile {
-  id: string
-  first_name: string
-  last_name: string
-  email: string
-  phone?: string
-  role: string
-  status: string
-  created_at: string
-  avatar_url?: string
-  total_orders?: number
-  total_sales?: number
-}
-
-interface User {
-  id: string
-  first_name: string
-  last_name: string
-  email: string
-  role: string
-  status: string
-  phone?: string
-  last_sign_in_at?: string
-  created_at: string
-  avatar_url?: string
-  total_orders?: number
-  total_sales?: number
 }
 
 export default function UsersPage() {
@@ -114,24 +86,49 @@ export default function UsersPage() {
 
   const fetchUsers = async () => {
     try {
-      console.log('Fetching users...')
+      console.log('=== FETCH USERS START ===')
       setIsLoading(true)
       
       const { data: { session } } = await supabase.auth.getSession();
+      console.log('Session check:', session ? 'Session exists' : 'No session')
+      
       if (!session) {
         console.log('No session available for fetching users')
         setIsLoading(false)
         return
       }
 
-      // 1. Fetch all profiles from the 'profiles' table.
+      console.log('Current user ID:', session.user.id)
+      console.log('Current user email:', session.user.email)
+
+      // Try to get users with emails via API route first
+      try {
+        const response = await fetch('/api/users')
+        if (response.ok) {
+          const { users } = await response.json()
+          console.log('Users fetched via API:', users)
+          setUsers(users)
+          setIsLoading(false)
+          return
+        } else {
+          console.log('API route failed, falling back to direct query')
+        }
+      } catch (apiError) {
+        console.log('API route error, falling back to direct query:', apiError)
+      }
+
+      // Fallback: Fetch all profiles from the 'profiles' table
+      console.log('Fetching profiles from database...')
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select('*')
         .order('created_at', { ascending: false })
 
+      console.log('Profiles query result:', { profiles, error: profilesError })
+
       if (profilesError) {
         console.error('Error fetching profiles:', profilesError.message)
+        console.error('Error details:', profilesError)
         toast({
           title: "Error",
           description: "No se pudieron cargar los perfiles: " + profilesError.message,
@@ -147,28 +144,35 @@ export default function UsersPage() {
         setIsLoading(false)
         return
       }
-      
-      
 
-      console.log('Profiles fetched:', profiles.length)
+      console.log('Profiles fetched successfully:', profiles.length)
+      console.log('First profile sample:', profiles[0])
 
-      const formattedUsers: User[] = profiles.map((profile: Profile): User => ({
-        id: profile.id,
-        first_name: profile.first_name,
-        last_name: profile.last_name,
-        email: profile.email || 'No disponible', // Use email from profile
-        role: profile.role,
-        status: profile.status,
-        phone: profile.phone,
-        last_sign_in_at: undefined, // This info is in auth.users, hard to get securely on client
-        created_at: profile.created_at,
-        avatar_url: profile.avatar_url,
-        total_orders: profile.total_orders,
-        total_sales: profile.total_sales,
-      }))
+      const formattedUsers: User[] = profiles.map((profile: Profile): User => {
+        // Check if this is the current user to get their email
+        const isCurrentUser = profile.id === session.user.id
+        const email = isCurrentUser ? session.user.email || 'No disponible' : 'No disponible'
+        
+        return {
+          id: profile.id,
+          first_name: profile.first_name || '',
+          last_name: profile.last_name || '',
+          email: email,
+          role: profile.role,
+          status: profile.status,
+          phone: profile.phone,
+          last_sign_in_at: undefined,
+          created_at: profile.created_at,
+          avatar_url: profile.avatar_url,
+          total_orders: profile.total_orders,
+          total_sales: profile.total_sales,
+        }
+      })
 
       console.log('Formatted users:', formattedUsers)
+      console.log('Current user role from profiles:', profiles.find((p: Profile) => p.id === session.user.id)?.role)
       setUsers(formattedUsers)
+      console.log('=== FETCH USERS END ===')
       
     } catch (error) {
       console.error('An unexpected error occurred in fetchUsers:', error)
@@ -179,6 +183,36 @@ export default function UsersPage() {
       })
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const handleUserStatusToggle = async (user: User) => {
+    try {
+      const newStatus = user.status === 'active' ? 'inactive' : 'active'
+      const { error } = await supabase
+        .from('profiles')
+        .update({ 
+          status: newStatus,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', user.id)
+
+      if (error) throw error
+
+      toast({
+        title: "Estado actualizado",
+        description: `Usuario ${newStatus === 'active' ? 'activado' : 'desactivado'} correctamente`,
+      })
+
+      // Refresh the users list
+      fetchUsers()
+    } catch (error) {
+      console.error('Error updating status:', error)
+      toast({
+        title: "Error",
+        description: "No se pudo actualizar el estado del usuario",
+        variant: "destructive",
+      })
     }
   }
 
@@ -239,15 +273,17 @@ export default function UsersPage() {
     })
   }
 
-  const getInitials = (firstName: string, lastName: string) => {
-    return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase()
+  const getInitials = (firstName: string | null | undefined, lastName: string | null | undefined) => {
+    const first = firstName?.charAt(0) || ''
+    const last = lastName?.charAt(0) || ''
+    return `${first}${last}`.toUpperCase()
   }
 
   const filteredUsers = users.filter((user) => {
     const matchesSearch =
-      (user.first_name ? user.first_name.toLowerCase() : '').includes(searchTerm.toLowerCase()) ||
-      (user.last_name ? user.last_name.toLowerCase() : '').includes(searchTerm.toLowerCase()) ||
-      (user.email ? user.email.toLowerCase() : '').includes(searchTerm.toLowerCase());
+      (user.first_name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+      (user.last_name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+      (user.email?.toLowerCase() || '').includes(searchTerm.toLowerCase());
     const matchesRole = selectedRole === "all" || user.role === selectedRole;
     return matchesSearch && matchesRole;
   });
@@ -356,8 +392,10 @@ export default function UsersPage() {
                           {getInitials(user.first_name, user.last_name)}
                         </div>
                         <div>
-                          <p className="font-medium">{`${user.first_name} ${user.last_name}`}</p>
-                          <p className="text-sm text-muted-foreground">{user.email}</p>
+                          <p className="font-medium">
+                            {`${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Sin nombre'}
+                          </p>
+                          <p className="text-sm text-muted-foreground">{user.email || 'Sin email'}</p>
                           {user.phone && (
                             <p className="text-sm text-muted-foreground">{user.phone}</p>
                           )}
@@ -397,29 +435,7 @@ export default function UsersPage() {
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             onClick={async () => {
-                              try {
-                                const newStatus = user.status === 'active' ? 'inactive' : 'active'
-                                const { error } = await supabase
-                                  .from('profiles')
-                                  .update({ status: newStatus })
-                                  .eq('id', user.id)
-
-                                if (error) throw error
-
-                                toast({
-                                  title: "Estado actualizado",
-                                  description: `Usuario ${newStatus === 'active' ? 'activado' : 'desactivado'} correctamente`,
-                                })
-
-                                fetchUsers()
-                              } catch (error) {
-                                console.error('Error updating status:', error)
-                                toast({
-                                  title: "Error",
-                                  description: "No se pudo actualizar el estado del usuario",
-                                  variant: "destructive",
-                                })
-                              }
+                              await handleUserStatusToggle(user)
                             }}
                           >
                             {user.status === 'active' ? (

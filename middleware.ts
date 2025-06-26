@@ -1,6 +1,20 @@
 import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
 
+// Definición de rutas y roles permitidos
+const protectedRoutes = {
+  "/dashboard/tables": ["admin", "cashier", "chef", "waiter"],
+  "/dashboard/orders": ["admin", "cashier", "chef", "waiter"],
+  "/dashboard/Facturacion": ["admin", "cashier"],
+  "/dashboard/menu": ["admin", "chef", "waiter", "cashier"],
+  "/dashboard/kitchen": ["admin", "chef", "waiter", "cashier"],
+  "/dashboard/inventory": ["admin", "chef", "cashier"],
+  "/dashboard/purchases": ["admin", "cashier"],
+  "/dashboard/reports": ["admin"],
+  "/dashboard/users": ["admin"],
+  "/dashboard/settings": ["admin"],
+};
+
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({
     request: {
@@ -69,16 +83,53 @@ export async function middleware(request: NextRequest) {
       data: { session },
     } = await supabase.auth.getSession()
 
-    // Si no hay sesión y está intentando acceder a rutas protegidas
-    if (!session && request.nextUrl.pathname.startsWith("/dashboard")) {
+    const { pathname } = request.nextUrl
+
+    // Si no hay sesión y se intenta acceder a una ruta protegida
+    if (!session && pathname.startsWith("/dashboard")) {
       const redirectUrl = new URL("/auth/login", request.url)
-      redirectUrl.searchParams.set("next", request.nextUrl.pathname)
+      redirectUrl.searchParams.set("next", pathname)
       return NextResponse.redirect(redirectUrl)
     }
 
-    // Si hay sesión y está en páginas de auth, redirigir al dashboard
-    if (session && (request.nextUrl.pathname.startsWith("/auth") || request.nextUrl.pathname === "/")) {
-      return NextResponse.redirect(new URL("/dashboard", request.url))
+    // Si hay sesión
+    if (session) {
+      // Redirigir desde la raíz o auth al dashboard
+      if (pathname.startsWith("/auth") || pathname === "/") {
+        return NextResponse.redirect(new URL("/dashboard", request.url))
+      }
+
+      // Verificar status para cualquier ruta bajo /dashboard
+      if (pathname.startsWith("/dashboard")) {
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('role, status')
+          .eq('id', session.user.id)
+          .single();
+
+        if (profileError || !profile) {
+          console.error("Error fetching user profile or profile not found", profileError);
+          return NextResponse.redirect(new URL("/dashboard?error=profile_not_found", request.url));
+        }
+
+        const userRole = profile.role;
+        const userStatus = profile.status;
+
+        if (userStatus !== 'active') {
+          const redirectUrl = new URL("/auth/login", request.url);
+          redirectUrl.searchParams.set("error", "inactive_user");
+          return NextResponse.redirect(redirectUrl);
+        }
+
+        // Comprobar roles para rutas protegidas
+        const routeRoles = Object.entries(protectedRoutes).find(([route]) => pathname.startsWith(route));
+        if (routeRoles) {
+          const allowedRoles = routeRoles[1];
+          if (!allowedRoles.includes(userRole)) {
+            return NextResponse.redirect(new URL("/dashboard?error=unauthorized", request.url));
+          }
+        }
+      }
     }
   } catch (error) {
     console.error("Error in middleware:", error)

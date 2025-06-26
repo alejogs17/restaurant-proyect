@@ -1,8 +1,6 @@
 "use client"
 
-import type React from "react"
-
-import { useState } from "react"
+import React, { useState, ChangeEvent, FormEvent } from "react"
 import { Button } from "@/Componentes/ui/button"
 import {
   Dialog,
@@ -42,7 +40,7 @@ export function CreateUserDialog({ open, onOpenChange, onUserCreated }: CreateUs
   const SIGNUP_COOLDOWN = 48000 // 48 seconds in milliseconds
   const [error, setError] = useState<string | null>(null)
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setIsLoading(true)
     setError(null)
@@ -163,7 +161,7 @@ export function CreateUserDialog({ open, onOpenChange, onUserCreated }: CreateUs
                 <Input
                   id="firstName"
                   value={formData.firstName}
-                  onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, firstName: e.target.value })}
                   placeholder="Nombre"
                   required
                 />
@@ -173,7 +171,7 @@ export function CreateUserDialog({ open, onOpenChange, onUserCreated }: CreateUs
                 <Input
                   id="lastName"
                   value={formData.lastName}
-                  onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, lastName: e.target.value })}
                   placeholder="Apellido"
                   required
                 />
@@ -185,7 +183,7 @@ export function CreateUserDialog({ open, onOpenChange, onUserCreated }: CreateUs
                 id="email"
                 type="email"
                 value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, email: e.target.value })}
                 placeholder="usuario@restaurante.com"
                 required
               />
@@ -195,7 +193,7 @@ export function CreateUserDialog({ open, onOpenChange, onUserCreated }: CreateUs
               <Input
                 id="phone"
                 value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, phone: e.target.value })}
                 placeholder="+57 300 123 4567"
               />
             </div>
@@ -220,7 +218,7 @@ export function CreateUserDialog({ open, onOpenChange, onUserCreated }: CreateUs
                   id="password"
                   type="password"
                   value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, password: e.target.value })}
                   placeholder="Mínimo 6 caracteres"
                   required
                 />
@@ -231,7 +229,7 @@ export function CreateUserDialog({ open, onOpenChange, onUserCreated }: CreateUs
                   id="confirmPassword"
                   type="password"
                   value={formData.confirmPassword}
-                  onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, confirmPassword: e.target.value })}
                   placeholder="Repetir contraseña"
                   required
                 />

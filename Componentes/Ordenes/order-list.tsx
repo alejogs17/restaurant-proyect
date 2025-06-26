@@ -9,6 +9,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/Componentes/ui/dialog"
 import { useToast } from "@/Componentes/ui/use-toast"
 import { createClient } from "@/lib/supabase/client"
+import { PaymentDialog } from "@/Componentes/Ordenes/payment-dialog"
 
 type OrderStatus = "pending" | "preparing" | "ready" | "delivered" | "completed" | "cancelled"
 type OrderType = "dine_in" | "takeout" | "delivery"
@@ -61,6 +62,8 @@ export function OrderList({ searchTerm, statusFilter, tabFilter }: OrderListProp
   const [loading, setLoading] = useState(true)
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [showDetailsDialog, setShowDetailsDialog] = useState(false)
+  const [showPaymentDialog, setShowPaymentDialog] = useState(false)
+  const [orderForPayment, setOrderForPayment] = useState<{ id: number; order_number: string; total: number } | null>(null)
   const { toast } = useToast()
   const supabase = createClient()
 
@@ -224,6 +227,15 @@ export function OrderList({ searchTerm, statusFilter, tabFilter }: OrderListProp
     }).format(amount)
   }
 
+  const handleProcessPayment = (order: Order) => {
+    setOrderForPayment({
+      id: order.id,
+      order_number: order.order_number,
+      total: order.total,
+    })
+    setShowPaymentDialog(true)
+  }
+
   const filteredOrders = orders.filter((order) => {
     const matchesSearch =
       order.order_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -238,8 +250,8 @@ export function OrderList({ searchTerm, statusFilter, tabFilter }: OrderListProp
 
   if (loading) {
     return (
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {Array.from({ length: 6 }).map((_, i) => (
+      <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {Array.from({ length: 8 }).map((_, i) => (
           <Card key={i} className="animate-pulse">
             <CardHeader>
               <div className="h-4 bg-gray-200 rounded w-3/4" />
@@ -256,9 +268,9 @@ export function OrderList({ searchTerm, statusFilter, tabFilter }: OrderListProp
 
   return (
     <>
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {filteredOrders.map((order) => (
-          <Card key={order.id} className="transition-all hover:shadow-lg">
+          <Card key={order.id} className="transition-all hover:shadow-lg flex flex-col">
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
@@ -316,6 +328,11 @@ export function OrderList({ searchTerm, statusFilter, tabFilter }: OrderListProp
                     >
                       Cancelar Pedido
                     </DropdownMenuItem>
+                    {(order.status === "delivered" || order.status === "ready") && (
+                      <DropdownMenuItem onClick={() => handleProcessPayment(order)}>
+                        Procesar Pago
+                      </DropdownMenuItem>
+                    )}
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
@@ -350,6 +367,8 @@ export function OrderList({ searchTerm, statusFilter, tabFilter }: OrderListProp
           </Card>
         ))}
       </div>
+
+      <PaymentDialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog} order={orderForPayment} />
 
       <Dialog open={showDetailsDialog} onOpenChange={setShowDetailsDialog}>
         <DialogContent className="max-w-2xl">

@@ -57,6 +57,7 @@ export function ProductsReport({ dateRange, startDate, endDate }: ProductsReport
           elementId="products-report-content"
           startDate={startDate}
           endDate={endDate}
+          reportTitle="Reporte de Productos"
         />
       </div>
       {/* Productos más vendidos */}

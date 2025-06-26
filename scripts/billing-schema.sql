@@ -146,3 +146,47 @@ CREATE TRIGGER trigger_set_invoice_number
   BEFORE INSERT ON invoices
   FOR EACH ROW
   EXECUTE FUNCTION set_invoice_number();
+
+-- Función para crear pago automático cuando una factura se marca como pagada
+CREATE OR REPLACE FUNCTION create_payment_on_invoice_paid()
+RETURNS TRIGGER AS $$
+BEGIN
+  -- Solo crear pago si el estado cambió a 'paid' y no existía antes
+  IF NEW.status = 'paid' AND (OLD.status IS NULL OR OLD.status != 'paid') THEN
+    -- Verificar que no existe ya un pago para esta factura
+    IF NOT EXISTS (
+      SELECT 1 FROM payments 
+      WHERE order_id = NEW.order_id 
+      AND amount = NEW.total
+    ) THEN
+      -- Crear el pago automáticamente
+      INSERT INTO payments (
+        order_id,
+        payment_method,
+        amount,
+        user_id,
+        reference_number,
+        notes,
+        payment_date
+      ) VALUES (
+        NEW.order_id,
+        'cash', -- Método por defecto, se puede cambiar manualmente después
+        NEW.total,
+        auth.uid(), -- Usuario que marcó la factura como pagada
+        'AUTO-' || NEW.invoice_number, -- Referencia automática
+        'Pago automático generado al marcar factura como pagada',
+        NOW()
+      );
+    END IF;
+  END IF;
+  
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Trigger para crear pago automático
+DROP TRIGGER IF EXISTS trigger_create_payment_on_invoice_paid ON invoices;
+CREATE TRIGGER trigger_create_payment_on_invoice_paid
+  AFTER UPDATE ON invoices
+  FOR EACH ROW
+  EXECUTE FUNCTION create_payment_on_invoice_paid();

@@ -81,7 +81,7 @@ export function SupplierList({ searchTerm }: SupplierListProps) {
 
   if (loading) {
     return (
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {Array.from({ length: 6 }).map((_, i) => (
           <Card key={i} className="animate-pulse">
             <CardHeader>
@@ -98,7 +98,7 @@ export function SupplierList({ searchTerm }: SupplierListProps) {
   }
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
       {filteredSuppliers.map((supplier) => (
         <Card key={supplier.id} className="transition-all hover:shadow-lg">
           <CardHeader className="pb-3">

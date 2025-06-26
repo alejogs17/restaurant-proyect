@@ -73,6 +73,7 @@ export function InventoryReport({ dateRange, startDate, endDate }: InventoryRepo
           elementId="inventory-report-content"
           startDate={startDate}
           endDate={endDate}
+          reportTitle="Reporte de Inventario"
         />
       </div>
 

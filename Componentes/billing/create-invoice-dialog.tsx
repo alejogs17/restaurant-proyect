@@ -1,8 +1,6 @@
 "use client"
 
-import type React from "react"
-
-import { useState, useEffect } from "react"
+import React, { useState, useEffect, ChangeEvent, FormEvent } from "react"
 import { Button } from "@/Componentes/ui/button"
 import {
   Dialog,
@@ -28,6 +26,7 @@ interface Order {
   discount: number
   total: number
   status: string
+  created_at?: string
 }
 
 interface CreateInvoiceDialogProps {
@@ -58,28 +57,66 @@ export function CreateInvoiceDialog({ open, onOpenChange }: CreateInvoiceDialogP
     }
   }, [open])
 
+  // Suscripción en tiempo real para actualizar la lista cuando se creen facturas
+  useEffect(() => {
+    if (!open) return
+
+    const channel = supabase
+      .channel('invoice-creation-channel')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'invoices' },
+        (payload: any) => {
+          console.log('Nueva factura creada:', payload)
+          // Actualizar la lista de pedidos cuando se crea una nueva factura
+          fetchOrders()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [open, supabase])
+
   const fetchOrders = async () => {
     try {
-      const { data, error } = await supabase
+      // Primero obtener todas las órdenes completadas o entregadas
+      const { data: allOrders, error: ordersError } = await supabase
         .from("orders")
-        .select("id, order_number, customer_name, subtotal, tax, discount, total, status, created_at")
+        .select(`
+          id, order_number, customer_name, subtotal, tax, discount, total, status, created_at
+        `)
+        .or('status.eq.completed,status.eq.delivered')
+        .order('created_at', { ascending: false })
 
-      if (error) {
-        console.error("Error fetching orders:", error)
-        throw error
+      if (ordersError) {
+        console.error("Error fetching orders:", ordersError)
+        throw ordersError
       }
 
-      // Filtrar por estado en el cliente (delivered y completed)
-      const filteredData = data ? data.filter((order: any) => 
-        ["delivered", "completed"].includes(order.status)
-      ) : []
+      // Luego obtener todas las facturas para filtrar
+      const { data: invoices, error: invoicesError } = await supabase
+        .from("invoices")
+        .select('order_id')
 
-      // Ordenar por fecha de creación (más reciente primero)
-      const sortedData = filteredData.sort((a: any, b: any) => 
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      )
+      if (invoicesError) {
+        console.error("Error fetching invoices:", invoicesError)
+        throw invoicesError
+      }
 
-      setOrders(sortedData)
+      // Crear un set de order_ids que ya tienen facturas
+      const invoicedOrderIds = new Set(invoices?.map((inv: { order_id: number }) => inv.order_id) || [])
+
+      // Filtrar las órdenes que no tienen facturas
+      const availableOrders = allOrders?.filter((order: Order) => !invoicedOrderIds.has(order.id)) || []
+      
+      setOrders(availableOrders)
+      
+      // Mostrar alert si no hay órdenes disponibles
+      if (availableOrders.length === 0) {
+        alert("No hay órdenes por facturar")
+      }
     } catch (error: any) {
       console.error("Error in fetchOrders:", error)
       toast({
@@ -93,7 +130,7 @@ export function CreateInvoiceDialog({ open, onOpenChange }: CreateInvoiceDialogP
 
   const handleOrderSelect = (orderIdStr: string) => {
     setOrderId(orderIdStr)
-    const order = orders.find((o) => o.id.toString() === orderIdStr)
+    const order = orders.find((o: Order) => o.id.toString() === orderIdStr)
     if (order) {
       setSelectedOrder(order)
       if (order.customer_name) {
@@ -110,7 +147,7 @@ export function CreateInvoiceDialog({ open, onOpenChange }: CreateInvoiceDialogP
     return `FAC-${year}${month}-${timestamp}`
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setLoading(true)
 
@@ -158,7 +195,11 @@ export function CreateInvoiceDialog({ open, onOpenChange }: CreateInvoiceDialogP
       setCustomerPhone("")
       setCustomerAddress("")
       setSelectedOrder(null)
+      
+      // Cerrar el diálogo
       onOpenChange(false)
+      
+      // Recargar la página para mostrar la nueva factura
       window.location.reload()
     } catch (error: any) {
       toast({
@@ -181,117 +222,135 @@ export function CreateInvoiceDialog({ open, onOpenChange }: CreateInvoiceDialogP
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="max-w-2xl w-[95vw] max-h-[90vh] overflow-hidden">
         <DialogHeader>
           <DialogTitle>Crear Nueva Factura</DialogTitle>
           <DialogDescription>
-            Selecciona un pedido completado y completa la información del cliente para generar la factura.
+            Selecciona un pedido y completa los datos del cliente.
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit}>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="order">Pedido</Label>
-              <Select value={orderId} onValueChange={handleOrderSelect} required>
+  
+        <form onSubmit={handleSubmit} className="overflow-y-auto max-h-[70vh] pr-1">
+          <div className="grid gap-3 text-sm">
+            {/* Selector del pedido */}
+            <div className="grid gap-1.5">
+              <Label>Pedido</Label>
+              <Select value={orderId} onValueChange={handleOrderSelect} required disabled={loading}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecciona un pedido" />
+                  <SelectValue placeholder={loading ? "Actualizando..." : "Selecciona un pedido"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {orders.map((order) => (
-                    <SelectItem key={order.id} value={order.id.toString()}>
-                      {order.order_number} - {formatCurrency(order.total)}
-                      {order.customer_name && ` - ${order.customer_name}`}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {selectedOrder && (
-              <div className="bg-gray-50 p-3 rounded-lg">
-                <h4 className="font-medium mb-2">Resumen del Pedido</h4>
-                <div className="text-sm space-y-1">
-                  <div className="flex justify-between">
-                    <span>Subtotal:</span>
-                    <span>{formatCurrency(selectedOrder.subtotal)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>IVA:</span>
-                    <span>{formatCurrency(selectedOrder.tax)}</span>
-                  </div>
-                  {selectedOrder.discount > 0 && (
-                    <div className="flex justify-between text-green-600">
-                      <span>Descuento:</span>
-                      <span>-{formatCurrency(selectedOrder.discount)}</span>
+                  {orders.length > 0 ? (
+                    orders.map((order: Order) => (
+                      <SelectItem key={order.id} value={order.id.toString()}>
+                        {order.order_number} - {formatCurrency(order.total)}
+                        {order.customer_name && ` - ${order.customer_name}`}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                      {loading ? "Cargando pedidos..." : "No hay pedidos disponibles para facturar"}
                     </div>
                   )}
-                  <div className="flex justify-between font-bold border-t pt-1">
-                    <span>Total:</span>
-                    <span>{formatCurrency(selectedOrder.total)}</span>
+                </SelectContent>
+              </Select>
+              {orders.length === 0 && !loading && (
+                <p className="text-xs text-muted-foreground">
+                  Solo se muestran pedidos completados o entregados que no tienen factura.
+                </p>
+              )}
+            </div>
+  
+            {/* Resumen del pedido */}
+            {selectedOrder && (
+              <div className="bg-gray-100 p-2 rounded-md text-sm space-y-1">
+                <h4 className="font-medium">Resumen</h4>
+                {[
+                  ["Subtotal", selectedOrder.subtotal],
+                  ["IVA", selectedOrder.tax],
+                  ...(selectedOrder.discount > 0 ? [["Descuento", -selectedOrder.discount]] : []),
+                  ["Total", selectedOrder.total],
+                ].map(([label, val]) => (
+                  <div
+                    key={label}
+                    className={`flex justify-between ${
+                      label === "Total" ? "font-bold border-t pt-1" : ""
+                    } ${label === "Descuento" ? "text-green-600" : ""}`}
+                  >
+                    <span>{label}:</span>
+                    <span>{formatCurrency(val as number)}</span>
                   </div>
-                </div>
+                ))}
               </div>
             )}
-
-            <div className="grid gap-2">
-              <Label htmlFor="customerName">Nombre del Cliente</Label>
+  
+            {/* Datos del cliente */}
+            <div className="grid gap-1.5">
+              <Label>Nombre del Cliente</Label>
               <Input
-                id="customerName"
                 placeholder="Nombre completo"
                 value={customerName}
-                onChange={(e) => setCustomerName(e.target.value)}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setCustomerName(e.target.value)}
                 required
               />
             </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="customerEmail">Email</Label>
+  
+            <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-1.5">
+                <Label>Email</Label>
                 <Input
-                  id="customerEmail"
                   type="email"
                   placeholder="cliente@email.com"
                   value={customerEmail}
-                  onChange={(e) => setCustomerEmail(e.target.value)}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => setCustomerEmail(e.target.value)}
                 />
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="customerPhone">Teléfono</Label>
+              <div className="grid gap-1.5">
+                <Label>Teléfono</Label>
                 <Input
-                  id="customerPhone"
                   placeholder="300 123 4567"
                   value={customerPhone}
-                  onChange={(e) => setCustomerPhone(e.target.value)}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => setCustomerPhone(e.target.value)}
                 />
               </div>
             </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="customerAddress">Dirección</Label>
+  
+            <div className="grid gap-1.5">
+              <Label>Dirección</Label>
               <Textarea
-                id="customerAddress"
-                placeholder="Dirección completa del cliente"
+                placeholder="Dirección del cliente"
                 value={customerAddress}
-                onChange={(e) => setCustomerAddress(e.target.value)}
+                onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setCustomerAddress(e.target.value)}
                 rows={2}
               />
             </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="dueDate">Fecha de Vencimiento</Label>
-              <Input id="dueDate" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} required />
+  
+            <div className="grid gap-1.5">
+              <Label>Fecha de Vencimiento</Label>
+              <Input
+                type="date"
+                value={dueDate}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setDueDate(e.target.value)}
+                required
+              />
             </div>
           </div>
-          <DialogFooter>
+  
+          {/* Footer fijo */}
+          <div className="mt-4 flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={loading} className="bg-orange-500 hover:bg-orange-600">
+            <Button 
+              type="submit" 
+              disabled={loading || orders.length === 0 || !selectedOrder} 
+              className="bg-orange-500 hover:bg-orange-600"
+            >
               {loading ? "Creando..." : "Crear Factura"}
             </Button>
-          </DialogFooter>
+          </div>
         </form>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

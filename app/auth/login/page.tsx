@@ -2,8 +2,8 @@
 
 import type React from "react"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Eye, EyeOff, Mail, Lock } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
@@ -11,6 +11,8 @@ import { Button } from "@/Componentes/ui/button"
 import { Input } from "@/Componentes/ui/input"
 import { Label } from "@/Componentes/ui/label"
 import { useToast } from "@/Componentes/ui/use-toast"
+import { Alert, AlertTitle, AlertDescription } from "@/Componentes/ui/alert"
+import { Session } from '@supabase/supabase-js'
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -20,6 +22,28 @@ export default function LoginPage() {
   const router = useRouter()
   const { toast } = useToast()
   const supabase = createClient()
+  const searchParams = useSearchParams();
+  const isInactive = searchParams.get("error") === "inactive_user";
+  const [session, setSession] = useState<Session | null>(null)
+
+  // Si el usuario está inactivo, cerrar sesión automáticamente
+  useEffect(() => {
+    if (isInactive) {
+      supabase.auth.signOut();
+    }
+  }, [isInactive, supabase]);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }: { data: { session: Session | null } }) => {
+      setSession(session)
+    })
+  }, [supabase])
+
+  // Solo redirigir al dashboard si NO es usuario inactivo
+  if (session && process.env.NODE_ENV !== 'development' && !isInactive) {
+    router.push("/dashboard")
+    return null
+  }
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -84,6 +108,14 @@ export default function LoginPage() {
 
   return (
     <div className="space-y-6 py-2">
+      {isInactive && (
+        <Alert variant="destructive">
+          <AlertTitle>Acceso Denegado</AlertTitle>
+          <AlertDescription>
+            Su usuario está suspendido, no puede ingresar al sistema
+          </AlertDescription>
+        </Alert>
+      )}
       <div className="text-center space-y-2">
         <h2 className="text-2xl font-semibold text-gray-900">Iniciar Sesión</h2>
         <p className="text-sm text-muted-foreground">Ingresa tus credenciales para acceder al sistema</p>

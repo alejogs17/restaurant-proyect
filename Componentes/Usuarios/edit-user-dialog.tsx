@@ -1,7 +1,6 @@
 "use client"
 
-import type React from "react"
-import { useState, useEffect } from "react"
+import React, { useState, useEffect, ChangeEvent, FormEvent } from "react"
 import { Button } from "@/Componentes/ui/button"
 import {
   Dialog,
@@ -51,7 +50,7 @@ export function EditUserDialog({ user, open, onOpenChange, onUserEdited }: EditU
     }
   }, [user])
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setIsLoading(true)
 
@@ -59,9 +58,18 @@ export function EditUserDialog({ user, open, onOpenChange, onUserEdited }: EditU
       if (!user) throw new Error("No se ha seleccionado un usuario")
 
       // Validaciones
-      if (!formData.firstName || !formData.lastName || !formData.role) {
+      if (!formData.firstName || !formData.lastName || !formData.role || !formData.status) {
         throw new Error("Todos los campos obligatorios deben ser completados")
       }
+
+      console.log('Updating user with data:', {
+        id: user.id,
+        first_name: formData.firstName,
+        last_name: formData.lastName,
+        phone: formData.phone,
+        role: formData.role,
+        status: formData.status
+      })
 
       // Update profile data in 'profiles' table
       const { data: profileData, error: profileError } = await supabase
@@ -69,8 +77,9 @@ export function EditUserDialog({ user, open, onOpenChange, onUserEdited }: EditU
         .update({
           first_name: formData.firstName,
           last_name: formData.lastName,
-          phone: formData.phone,
+          phone: formData.phone || null,
           role: formData.role,
+          status: formData.status,
           updated_at: new Date().toISOString()
         })
         .eq('id', user.id)
@@ -78,14 +87,18 @@ export function EditUserDialog({ user, open, onOpenChange, onUserEdited }: EditU
         .single()
 
       if (profileError) {
+        console.error('Profile update error:', profileError)
         throw new Error(`Error al actualizar el perfil: ${profileError.message}`)
       }
 
+      console.log('Profile updated successfully:', profileData)
+
       toast({
         title: "Usuario actualizado",
-        description: "Los datos del usuario han sido actualizados.",
+        description: "Los datos del usuario han sido actualizados correctamente.",
       })
 
+      // Call the callback to refresh the users list
       onUserEdited?.()
       onOpenChange(false)
     } catch (error) {
@@ -116,7 +129,7 @@ export function EditUserDialog({ user, open, onOpenChange, onUserEdited }: EditU
               <Input
                 id="firstName"
                 value={formData.firstName}
-                onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, firstName: e.target.value })}
                 className="col-span-3"
               />
             </div>
@@ -127,7 +140,7 @@ export function EditUserDialog({ user, open, onOpenChange, onUserEdited }: EditU
               <Input
                 id="lastName"
                 value={formData.lastName}
-                onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, lastName: e.target.value })}
                 className="col-span-3"
               />
             </div>
@@ -155,7 +168,7 @@ export function EditUserDialog({ user, open, onOpenChange, onUserEdited }: EditU
               <Input
                 id="phone"
                 value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, phone: e.target.value })}
                 placeholder="+57 300 123 4567"
               />
             </div>

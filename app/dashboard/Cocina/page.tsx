@@ -1,14 +1,71 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { RefreshCw, Clock, ChefHat } from "lucide-react"
 import { Button } from "@/Componentes/ui/button"
 import { Badge } from "@/Componentes/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/Componentes/ui/tabs"
 import { KitchenOrderBoard } from "@/Componentes/kitchen/kitchen-order-board"
+import { createClient } from "@/lib/supabase/client"
+
+interface OrderStats {
+  pending: number
+  preparing: number
+  ready: number
+}
 
 export default function KitchenPage() {
   const [autoRefresh, setAutoRefresh] = useState(true)
+  const [orderStats, setOrderStats] = useState<OrderStats>({
+    pending: 0,
+    preparing: 0,
+    ready: 0
+  })
+  const [loading, setLoading] = useState(true)
+  const supabase = createClient()
+
+  const fetchOrderStats = async () => {
+    try {
+      // Obtener pedidos pendientes
+      const { count: pendingCount } = await supabase
+        .from('orders')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'pending')
+
+      // Obtener pedidos en preparación
+      const { count: preparingCount } = await supabase
+        .from('orders')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'preparing')
+
+      // Obtener pedidos listos
+      const { count: readyCount } = await supabase
+        .from('orders')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'ready')
+
+      setOrderStats({
+        pending: pendingCount || 0,
+        preparing: preparingCount || 0,
+        ready: readyCount || 0
+      })
+    } catch (error) {
+      console.error('Error fetching order stats:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchOrderStats()
+  }, [])
+
+  useEffect(() => {
+    if (autoRefresh) {
+      const interval = setInterval(fetchOrderStats, 5000) // Actualizar cada 5 segundos
+      return () => clearInterval(interval)
+    }
+  }, [autoRefresh])
 
   return (
     <div className="space-y-6">
@@ -32,13 +89,15 @@ export default function KitchenPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
           <div className="flex items-center gap-2 mb-2">
             <Clock className="h-5 w-5 text-amber-600" />
             <h3 className="font-semibold text-amber-800">Pendientes</h3>
           </div>
-          <div className="text-2xl font-bold text-amber-600">5</div>
+          <div className="text-2xl font-bold text-amber-600">
+            {loading ? "..." : orderStats.pending}
+          </div>
           <p className="text-sm text-amber-600">Pedidos esperando</p>
         </div>
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -46,14 +105,18 @@ export default function KitchenPage() {
             <ChefHat className="h-5 w-5 text-blue-600" />
             <h3 className="font-semibold text-blue-800">En Preparación</h3>
           </div>
-          <div className="text-2xl font-bold text-blue-600">8</div>
+          <div className="text-2xl font-bold text-blue-600">
+            {loading ? "..." : orderStats.preparing}
+          </div>
           <p className="text-sm text-blue-600">Siendo preparados</p>
         </div>
         <div className="bg-green-50 border border-green-200 rounded-lg p-4">
           <div className="flex items-center gap-2 mb-2">
-            <Badge className="bg-green-500">Listos</Badge>
+            <div className="bg-green-500 text-white px-2 py-1 rounded-md text-sm font-semibold">Listos</div>
           </div>
-          <div className="text-2xl font-bold text-green-600">3</div>
+          <div className="text-2xl font-bold text-green-600">
+            {loading ? "..." : orderStats.ready}
+          </div>
           <p className="text-sm text-green-600">Para entregar</p>
         </div>
       </div>

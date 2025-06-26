@@ -1,16 +1,27 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { CreditCard, Banknote, Smartphone, Building, TrendingUp } from "lucide-react"
+import { useState, useEffect, useCallback } from "react"
+import { CreditCard, Banknote, Smartphone, Building, TrendingUp, FileText } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/Componentes/ui/card"
 import { useToast } from "@/Componentes/ui/use-toast"
 import { createClient } from "@/lib/supabase/client"
+import { RealtimePostgresChangesPayload } from "@supabase/supabase-js"
 
 interface PaymentStats {
   method: string
   total: number
   count: number
   percentage: number
+}
+
+type PaymentQueryData = {
+  payment_method: string
+  amount: number
+}
+
+type InvoiceQueryData = {
+  total: number
+  status: string
 }
 
 export function PaymentMethodStats() {
@@ -20,46 +31,82 @@ export function PaymentMethodStats() {
   const { toast } = useToast()
   const supabase = createClient()
 
-  useEffect(() => {
-    fetchStats()
-  }, [])
-
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
     try {
       // Obtener estadísticas de métodos de pago del día actual
       const today = new Date().toISOString().split("T")[0]
 
-      const { data, error } = await supabase
+      // Obtener pagos del día
+      const { data: paymentsData, error: paymentsError } = await supabase
         .from("payments")
         .select("payment_method, amount")
         .gte("payment_date", `${today}T00:00:00`)
         .lt("payment_date", `${today}T23:59:59`)
 
-      if (error) throw error
+      if (paymentsError) throw paymentsError
 
-      // Calcular estadísticas
+      // Obtener facturas creadas hoy
+      const { data: invoicesData, error: invoicesError } = await supabase
+        .from("invoices")
+        .select("total, status")
+        .gte("created_at", `${today}T00:00:00`)
+        .lt("created_at", `${today}T23:59:59`)
+
+      if (invoicesError) throw invoicesError
+
+      // Calcular estadísticas de pagos
       const methodTotals: { [key: string]: { total: number; count: number } } = {}
-      let total = 0
+      let totalPayments = 0
 
-      data?.forEach((payment) => {
+      paymentsData?.forEach((payment: PaymentQueryData) => {
         const method = payment.payment_method
         if (!methodTotals[method]) {
           methodTotals[method] = { total: 0, count: 0 }
         }
         methodTotals[method].total += payment.amount
         methodTotals[method].count += 1
-        total += payment.amount
+        totalPayments += payment.amount
       })
+
+      // Separar facturas pagadas y pendientes
+      const paidInvoices = invoicesData?.filter((invoice: InvoiceQueryData) => invoice.status === 'paid') || []
+      const pendingInvoices = invoicesData?.filter((invoice: InvoiceQueryData) => invoice.status !== 'paid') || []
+
+      const totalPaidInvoices = paidInvoices.reduce((sum: number, invoice: InvoiceQueryData) => sum + invoice.total, 0)
+      const totalPendingInvoices = pendingInvoices.reduce((sum: number, invoice: InvoiceQueryData) => sum + invoice.total, 0)
+
+      // El total del día incluye pagos + facturas pendientes (las pagadas ya están en pagos)
+      const totalRevenue = totalPayments + totalPendingInvoices
 
       const statsArray = Object.entries(methodTotals).map(([method, data]) => ({
         method,
         total: data.total,
         count: data.count,
-        percentage: total > 0 ? (data.total / total) * 100 : 0,
+        percentage: totalRevenue > 0 ? (data.total / totalRevenue) * 100 : 0,
       }))
 
+      // Agregar estadística de facturas pagadas si hay facturas pagadas del día
+      if (totalPaidInvoices > 0) {
+        statsArray.push({
+          method: "paid_invoices",
+          total: totalPaidInvoices,
+          count: paidInvoices.length,
+          percentage: totalRevenue > 0 ? (totalPaidInvoices / totalRevenue) * 100 : 0,
+        })
+      }
+
+      // Agregar estadística de facturas pendientes si hay facturas pendientes del día
+      if (totalPendingInvoices > 0) {
+        statsArray.push({
+          method: "pending_invoices",
+          total: totalPendingInvoices,
+          count: pendingInvoices.length,
+          percentage: totalRevenue > 0 ? (totalPendingInvoices / totalRevenue) * 100 : 0,
+        })
+      }
+
       setStats(statsArray)
-      setTotalRevenue(total)
+      setTotalRevenue(totalRevenue)
     } catch (error: any) {
       toast({
         title: "Error",
@@ -69,7 +116,44 @@ export function PaymentMethodStats() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [supabase, toast])
+
+  useEffect(() => {
+    // Fetch initial data
+    fetchStats()
+
+    // Subscribe to changes in payments table
+    const paymentsChannel = supabase
+      .channel('payment-stats-channel')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'payments' },
+        (payload: RealtimePostgresChangesPayload<any>) => {
+          console.log('Payment change received!', payload)
+          fetchStats() // Refetch stats on any change
+        }
+      )
+      .subscribe()
+
+    // Subscribe to changes in invoices table
+    const invoicesChannel = supabase
+      .channel('invoice-stats-channel')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'invoices' },
+        (payload: RealtimePostgresChangesPayload<any>) => {
+          console.log('Invoice change received!', payload)
+          fetchStats() // Refetch stats on any change
+        }
+      )
+      .subscribe()
+
+    // Cleanup subscription on component unmount
+    return () => {
+      supabase.removeChannel(paymentsChannel)
+      supabase.removeChannel(invoicesChannel)
+    }
+  }, [supabase, fetchStats])
 
   const getMethodIcon = (method: string) => {
     switch (method) {
@@ -82,6 +166,10 @@ export function PaymentMethodStats() {
         return <Smartphone className="h-5 w-5 text-purple-600" />
       case "bank_transfer":
         return <Building className="h-5 w-5 text-gray-600" />
+      case "pending_invoices":
+        return <FileText className="h-5 w-5 text-orange-600" />
+      case "paid_invoices":
+        return <FileText className="h-5 w-5 text-green-600" />
       default:
         return <CreditCard className="h-5 w-5 text-gray-600" />
     }
@@ -99,6 +187,10 @@ export function PaymentMethodStats() {
         return "Pago Móvil"
       case "bank_transfer":
         return "Transferencia"
+      case "pending_invoices":
+        return "Facturas Pendientes"
+      case "paid_invoices":
+        return "Facturas Pagadas"
       case "other":
         return "Otro"
       default:
@@ -116,7 +208,7 @@ export function PaymentMethodStats() {
 
   if (loading) {
     return (
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         {Array.from({ length: 5 }).map((_, i) => (
           <Card key={i} className="animate-pulse">
             <CardHeader>
@@ -132,7 +224,7 @@ export function PaymentMethodStats() {
   }
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
       {/* Total Revenue */}
       <Card className="border-orange-200 bg-orange-50">
         <CardHeader className="pb-3">

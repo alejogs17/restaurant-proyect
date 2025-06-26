@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Plus, Search, AlertTriangle } from "lucide-react"
 import { Button } from "@/Componentes/ui/button"
 import { Input } from "@/Componentes/ui/input"
@@ -9,18 +9,47 @@ import { InventoryList } from "@/Componentes/Inventario/inventory-list"
 import { InventoryAlerts } from "@/Componentes/Inventario/inventory-alerts"
 import { CreateInventoryItemDialog } from "@/Componentes/Inventario/create-inventory-item-dialog"
 import { Card, CardContent, CardHeader, CardTitle } from "@/Componentes/ui/card"
+import { createClient } from "@/lib/supabase/client"
+
+interface InventoryStats {
+  total_items: number
+  low_stock_count: number
+  out_of_stock_count: number
+  total_value: number
+}
 
 export default function InventoryPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [showCreateItem, setShowCreateItem] = useState(false)
+  const [inventoryStats, setInventoryStats] = useState<InventoryStats>({
+    total_items: 0,
+    low_stock_count: 0,
+    out_of_stock_count: 0,
+    total_value: 0,
+  })
+  const [loading, setLoading] = useState(true)
 
-  // Estadísticas del inventario
-  const inventoryStats = {
-    totalItems: 45,
-    lowStock: 8,
-    outOfStock: 3,
-    totalValue: 15420000,
-  }
+  useEffect(() => {
+    const fetchInventoryStats = async () => {
+      try {
+        setLoading(true)
+        const supabase = createClient()
+        const { data, error } = await supabase.rpc("get_inventory_stats")
+        
+        if (error) {
+          console.error("Error fetching inventory stats:", error)
+        } else if (data && data.length > 0) {
+          setInventoryStats(data[0])
+        }
+      } catch (error) {
+        console.error("Error fetching inventory stats:", error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchInventoryStats()
+  }, [])
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("es-CO", {
@@ -32,7 +61,7 @@ export default function InventoryPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Gestión de Inventario</h1>
           <p className="text-gray-600">Controla el stock de insumos y productos</p>
@@ -44,13 +73,15 @@ export default function InventoryPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Insumos</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{inventoryStats.totalItems}</div>
+            <div className="text-2xl font-bold">
+              {loading ? "..." : inventoryStats.total_items}
+            </div>
             <p className="text-xs text-muted-foreground">productos registrados</p>
           </CardContent>
         </Card>
@@ -61,7 +92,9 @@ export default function InventoryPage() {
             <AlertTriangle className="h-4 w-4 text-amber-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-amber-600">{inventoryStats.lowStock}</div>
+            <div className="text-2xl font-bold text-amber-600">
+              {loading ? "..." : inventoryStats.low_stock_count}
+            </div>
             <p className="text-xs text-muted-foreground">requieren reposición</p>
           </CardContent>
         </Card>
@@ -72,7 +105,9 @@ export default function InventoryPage() {
             <AlertTriangle className="h-4 w-4 text-red-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">{inventoryStats.outOfStock}</div>
+            <div className="text-2xl font-bold text-red-600">
+              {loading ? "..." : inventoryStats.out_of_stock_count}
+            </div>
             <p className="text-xs text-muted-foreground">agotados</p>
           </CardContent>
         </Card>
@@ -82,7 +117,9 @@ export default function InventoryPage() {
             <CardTitle className="text-sm font-medium">Valor Total</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{formatCurrency(inventoryStats.totalValue)}</div>
+            <div className="text-2xl font-bold text-green-600">
+              {loading ? "..." : formatCurrency(inventoryStats.total_value)}
+            </div>
             <p className="text-xs text-muted-foreground">inventario valorizado</p>
           </CardContent>
         </Card>

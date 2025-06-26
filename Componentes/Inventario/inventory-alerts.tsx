@@ -1,12 +1,13 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { AlertTriangle, Package, ShoppingCart } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/Componentes/ui/card"
 import { Badge } from "@/Componentes/ui/badge"
 import { Button } from "@/Componentes/ui/button"
 import { useToast } from "@/Componentes/ui/use-toast"
 import { createClient } from "@/lib/supabase/client"
+import { RealtimePostgresChangesPayload } from "@supabase/supabase-js"
 
 interface InventoryItem {
   id: number
@@ -25,27 +26,13 @@ export function InventoryAlerts() {
   const { toast } = useToast()
   const supabase = createClient()
 
-  useEffect(() => {
-    fetchAlerts()
-  }, [])
-
-  const fetchAlerts = async () => {
+  const fetchAlerts = useCallback(async () => {
     try {
-      // Get items with low stock (quantity <= min_quantity but > 0)
-      const { data: lowStock, error: lowStockError } = await supabase
-        .from("inventory_items")
-        .select("*")
-        .lte("quantity", supabase.rpc("min_quantity"))
-        .gt("quantity", 0)
-
+      setLoading(true);
+      const { data: lowStock, error: lowStockError } = await supabase.rpc("get_low_stock_items")
       if (lowStockError) throw lowStockError
 
-      // Get items out of stock (quantity = 0)
-      const { data: outOfStock, error: outOfStockError } = await supabase
-        .from("inventory_items")
-        .select("*")
-        .eq("quantity", 0)
-
+      const { data: outOfStock, error: outOfStockError } = await supabase.rpc("get_out_of_stock_items")
       if (outOfStockError) throw outOfStockError
 
       setLowStockItems(lowStock || [])
@@ -59,7 +46,30 @@ export function InventoryAlerts() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [supabase, toast])
+
+  useEffect(() => {
+    // Fetch initial data
+    fetchAlerts()
+
+    // Subscribe to changes in inventory_items table
+    const channel = supabase
+      .channel('inventory-alerts-channel')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'inventory_items' },
+        (payload: any) => {
+          console.log('Change received!', payload)
+          fetchAlerts() // Refetch alerts on any change
+        }
+      )
+      .subscribe()
+
+    // Cleanup subscription on component unmount
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [supabase, fetchAlerts])
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("es-CO", {
@@ -71,7 +81,7 @@ export function InventoryAlerts() {
 
   if (loading) {
     return (
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {Array.from({ length: 4 }).map((_, i) => (
           <Card key={i} className="animate-pulse">
             <CardHeader>
@@ -89,7 +99,7 @@ export function InventoryAlerts() {
   return (
     <div className="space-y-6">
       {/* Summary Cards */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <Card className="border-red-200 bg-red-50">
           <CardHeader className="pb-3">
             <CardTitle className="text-lg flex items-center gap-2 text-red-700">
@@ -137,7 +147,7 @@ export function InventoryAlerts() {
             <AlertTriangle className="h-5 w-5" />
             Insumos Sin Stock
           </h3>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {outOfStockItems.map((item) => (
               <Card key={item.id} className="border-red-200 bg-red-50">
                 <CardHeader className="pb-3">
@@ -185,7 +195,7 @@ export function InventoryAlerts() {
             <Package className="h-5 w-5" />
             Insumos con Stock Bajo
           </h3>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {lowStockItems.map((item) => (
               <Card key={item.id} className="border-amber-200 bg-amber-50">
                 <CardHeader className="pb-3">
