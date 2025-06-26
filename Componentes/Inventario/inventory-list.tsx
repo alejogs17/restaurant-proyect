@@ -194,13 +194,45 @@ export function InventoryList({ searchTerm }: InventoryListProps) {
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Editar producto</DialogTitle>
+            <DialogTitle>{adjustmentType === "add" ? "Agregar Stock" : adjustmentType === "subtract" ? "Reducir Stock" : "Editar producto"}</DialogTitle>
           </DialogHeader>
           <form
             onSubmit={async (e) => {
               e.preventDefault()
               if (!itemToEdit) return
               const supabase = createClient()
+
+              if (adjustmentType === "add" || adjustmentType === "subtract") {
+                const cantidadAjuste = Number(adjustmentQuantity)
+                if (isNaN(cantidadAjuste) || cantidadAjuste <= 0) {
+                  alert("Ingresa una cantidad válida para ajustar el stock.")
+                  return
+                }
+                let nuevaCantidad = itemToEdit.quantity
+                if (adjustmentType === "add") {
+                  nuevaCantidad += cantidadAjuste
+                } else {
+                  nuevaCantidad -= cantidadAjuste
+                  if (nuevaCantidad < 0) nuevaCantidad = 0
+                }
+                const { error } = await supabase
+                  .from('inventory_items')
+                  .update({ quantity: nuevaCantidad })
+                  .eq('id', itemToEdit.id)
+                if (error) {
+                  alert('Error al actualizar: ' + error.message)
+                } else {
+                  setShowEditDialog(false)
+                  setItemToEdit(null)
+                  setAdjustmentQuantity("")
+                  // Refrescar lista
+                  const { data } = await supabase.from('inventory_items').select('*')
+                  setItems(data || [])
+                }
+                return
+              }
+
+              // Edición normal
               const { error } = await supabase
                 .from('inventory_items')
                 .update({
@@ -224,67 +256,84 @@ export function InventoryList({ searchTerm }: InventoryListProps) {
             }}
             className="space-y-4"
           >
-            <div>
-              <label className="block text-sm font-medium">Nombre</label>
-              <input
-                type="text"
-                className="input input-bordered w-full"
-                value={editForm.name}
-                onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium">Descripción</label>
-              <input
-                type="text"
-                className="input input-bordered w-full"
-                value={editForm.description}
-                onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium">Unidad</label>
-              <input
-                type="text"
-                className="input input-bordered w-full"
-                value={editForm.unit}
-                onChange={e => setEditForm(f => ({ ...f, unit: e.target.value }))}
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium">Cantidad</label>
-              <input
-                type="number"
-                className="input input-bordered w-full"
-                value={editForm.quantity}
-                onChange={e => setEditForm(f => ({ ...f, quantity: Number(e.target.value) }))}
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium">Cantidad mínima</label>
-              <input
-                type="number"
-                className="input input-bordered w-full"
-                value={editForm.min_quantity}
-                onChange={e => setEditForm(f => ({ ...f, min_quantity: Number(e.target.value) }))}
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium">Costo por unidad</label>
-              <input
-                type="number"
-                className="input input-bordered w-full"
-                value={editForm.cost_per_unit}
-                onChange={e => setEditForm(f => ({ ...f, cost_per_unit: Number(e.target.value) }))}
-                required
-              />
-            </div>
+            {adjustmentType === "add" || adjustmentType === "subtract" ? (
+              <div>
+                <label className="block text-sm font-medium">Cantidad a {adjustmentType === "add" ? "agregar" : "reducir"}</label>
+                <input
+                  type="number"
+                  className="input input-bordered w-full"
+                  value={adjustmentQuantity}
+                  onChange={e => setAdjustmentQuantity(e.target.value)}
+                  min="1"
+                  required
+                />
+                <p className="text-xs text-muted-foreground mt-1">Stock actual: {itemToEdit?.quantity} {itemToEdit?.unit}</p>
+              </div>
+            ) : (
+              <>
+                <div>
+                  <label className="block text-sm font-medium">Nombre</label>
+                  <input
+                    type="text"
+                    className="input input-bordered w-full"
+                    value={editForm.name}
+                    onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium">Descripción</label>
+                  <input
+                    type="text"
+                    className="input input-bordered w-full"
+                    value={editForm.description}
+                    onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium">Unidad</label>
+                  <input
+                    type="text"
+                    className="input input-bordered w-full"
+                    value={editForm.unit}
+                    onChange={e => setEditForm(f => ({ ...f, unit: e.target.value }))}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium">Cantidad</label>
+                  <input
+                    type="number"
+                    className="input input-bordered w-full"
+                    value={editForm.quantity}
+                    onChange={e => setEditForm(f => ({ ...f, quantity: Number(e.target.value) }))}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium">Cantidad mínima</label>
+                  <input
+                    type="number"
+                    className="input input-bordered w-full"
+                    value={editForm.min_quantity}
+                    onChange={e => setEditForm(f => ({ ...f, min_quantity: Number(e.target.value) }))}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium">Costo por unidad</label>
+                  <input
+                    type="number"
+                    className="input input-bordered w-full"
+                    value={editForm.cost_per_unit}
+                    onChange={e => setEditForm(f => ({ ...f, cost_per_unit: Number(e.target.value) }))}
+                    required
+                  />
+                </div>
+              </>
+            )}
             <div className="flex justify-end gap-2">
-              <button type="button" className="btn" onClick={() => setShowEditDialog(false)}>
+              <button type="button" className="btn" onClick={() => { setShowEditDialog(false); setAdjustmentQuantity(""); }}>
                 Cancelar
               </button>
               <button type="submit" className="btn btn-primary">

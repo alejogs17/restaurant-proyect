@@ -286,142 +286,23 @@ export function PurchaseList({ searchTerm }: PurchaseListProps) {
 
       // If status is changing to completed, update inventory
       if (!wasCompleted && willBeCompleted) {
-        console.log('Changing status to completed, will update inventory')
-
-        // Verificar permisos del usuario
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-        if (sessionError || !session) {
-          console.error('Session error:', sessionError)
-          toast({
-            title: "Error",
-            description: "No tienes permisos para actualizar el inventario. Por favor, inicia sesión nuevamente.",
-            variant: "destructive",
-          })
-          return
-        }
-
-        // Verificar rol del usuario
-        const { data: userProfile, error: profileError } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', session.user.id)
-          .single()
-
-        if (profileError || !userProfile) {
-          console.error('Profile error:', profileError)
-          toast({
-            title: "Error",
-            description: "No se pudo verificar tus permisos. Por favor, contacta al administrador.",
-            variant: "destructive",
-          })
-          return
-        }
-
-        if (!['admin', 'cashier'].includes(userProfile.role)) {
-          console.error('Unauthorized role:', userProfile.role)
-          toast({
-            title: "Error",
-            description: "No tienes los permisos necesarios para actualizar el inventario.",
-            variant: "destructive",
-          })
-          return
-        }
-
-        // Get purchase items
+        // Obtener los productos de la compra
         const { data: purchaseItems, error: itemsError } = await supabase
           .from('purchase_items')
-          .select(`
-            id,
-            inventory_item_id,
-            quantity,
-            unit_price,
-            total_price
-          `)
-          .eq('purchase_id', selectedPurchase.id)
+          .select('id, inventory_item_id, quantity')
+          .eq('purchase_id', selectedPurchase.id);
 
-        if (itemsError) {
-          throw itemsError
-        }
+        if (itemsError) throw itemsError;
 
-        // Update inventory for each item
-        console.log('Starting inventory update process...')
-        console.log('Purchase items to process:', purchaseItems)
-
+        // Actualizar inventario para cada producto
         for (const item of purchaseItems) {
-          console.log('Processing item:', {
-            raw_item: item,
-            inventory_item_id: item?.inventory_item_id,
-            quantity: item?.quantity,
-            typeof_id: typeof item?.inventory_item_id,
-            typeof_quantity: typeof item?.quantity
-          })
-
-          if (!item?.inventory_item_id || !item?.quantity) {
-            console.error("Item data is incomplete:", {
-              item,
-              has_id: !!item?.inventory_item_id,
-              has_quantity: !!item?.quantity
-            })
-            continue
-          }
-
-          try {
-            const itemId = parseInt(item.inventory_item_id.toString())
-            const quantityChange = parseFloat(item.quantity.toString())
-
-            console.log('Calling update_inventory_quantity with:', {
-              itemId,
-              quantityChange,
-              typeof_itemId: typeof itemId,
-              typeof_quantityChange: typeof quantityChange
-            })
-
-            const { data: updateResult, error: inventoryError } = await supabase.rpc(
-              "update_inventory_quantity",
-              {
-                p_item_id: itemId,
-                p_quantity_change: quantityChange
-              }
-            )
-
-            console.log('Update result:', { updateResult, inventoryError })
-
-            if (inventoryError) {
-              console.error("--- DETAILED INVENTORY UPDATE ERROR ---");
-              console.error("Timestamp:", new Date().toISOString());
-              console.error("Item being processed:", JSON.stringify(item, null, 2));
-              console.error("Parsed values:", { itemId, quantityChange });
-              console.error("Full inventoryError object:", JSON.stringify(inventoryError, null, 2));
-              console.error("Error message:", inventoryError.message);
-              console.error("Error code:", inventoryError.code);
-              console.error("Error details:", inventoryError.details);
-              console.error("Error hint:", inventoryError.hint);
-              console.error("--- END OF ERROR REPORT ---");
-
-              toast({
-                title: "Error de Inventario",
-                description: `Error al actualizar item ${itemId}: ${inventoryError.message}`,
-                variant: "destructive",
-              })
-            } else {
-              console.log('Inventory updated successfully:', {
-                itemId,
-                quantityChange,
-                result: updateResult
-              })
-            }
-          } catch (error) {
-            console.error('Error processing inventory update:', {
-              error,
-              item,
-              error_message: error instanceof Error ? error.message : 'Unknown error'
-            })
-            
-            toast({
-              title: "Error de Inventario",
-              description: "Error al procesar la actualización del inventario",
-              variant: "destructive",
-            })
+          console.log('Actualizando inventario:', item.inventory_item_id, item.quantity);
+          const { error: inventoryError } = await supabase.rpc('update_inventory_quantity', {
+            p_item_id: item.inventory_item_id,
+            p_quantity_change: item.quantity
+          });
+          if (inventoryError) {
+            console.error('Error actualizando inventario:', inventoryError);
           }
         }
       }

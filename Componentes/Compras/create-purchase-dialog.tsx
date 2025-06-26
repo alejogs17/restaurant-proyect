@@ -256,6 +256,22 @@ export function CreatePurchaseDialog({ open, onOpenChange, onSuccess }: CreatePu
 
       if (itemsError) throw itemsError
 
+      // Actualizar inventario para cada producto comprado
+      for (const item of purchaseItemsData) {
+        const { error: inventoryError } = await supabase.rpc('update_inventory_quantity', {
+          p_item_id: item.inventory_item_id,
+          p_quantity_change: item.quantity
+        });
+        if (inventoryError) {
+          console.error('Error actualizando inventario:', inventoryError);
+          toast({
+            title: "Error",
+            description: `No se pudo actualizar el inventario para el producto con ID ${item.inventory_item_id}`,
+            variant: "destructive",
+          });
+        }
+      }
+
       toast({
         title: "Compra creada",
         description: `La compra #${purchaseData.id} ha sido registrada correctamente`,
