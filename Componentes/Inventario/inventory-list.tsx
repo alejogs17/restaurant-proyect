@@ -35,6 +35,8 @@ export function InventoryList({ searchTerm }: InventoryListProps) {
   const [showEditDialog, setShowEditDialog] = useState(false)
   const [itemToEdit, setItemToEdit] = useState<InventoryItem | null>(null)
   const [editForm, setEditForm] = useState<Partial<InventoryItem>>({})
+  const [adjustmentType, setAdjustmentType] = useState<"add" | "subtract" | null>(null)
+  const [adjustmentQuantity, setAdjustmentQuantity] = useState("")
 
   useEffect(() => {
     const fetchInventory = async () => {
@@ -137,11 +139,34 @@ export function InventoryList({ searchTerm }: InventoryListProps) {
                             min_quantity: item.min_quantity,
                             cost_per_unit: item.cost_per_unit
                           })
+                          setAdjustmentType(null)
                           setShowEditDialog(true)
                         }}
                       >
                         <Pencil className="mr-2 h-4 w-4" />
                         Editar
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => {
+                          setItemToEdit(item)
+                          setEditForm({})
+                          setAdjustmentType("add")
+                          setShowEditDialog(true)
+                        }}
+                      >
+                        <Plus className="mr-2 h-4 w-4" />
+                        Agregar Stock
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => {
+                          setItemToEdit(item)
+                          setEditForm({})
+                          setAdjustmentType("subtract")
+                          setShowEditDialog(true)
+                        }}
+                      >
+                        <Minus className="mr-2 h-4 w-4" />
+                        Reducir Stock
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         className="text-red-600 focus:text-red-600"
@@ -193,7 +218,7 @@ export function InventoryList({ searchTerm }: InventoryListProps) {
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Editar Ítem</DialogTitle>
+            <DialogTitle>{adjustmentType === "add" ? "Agregar Stock" : adjustmentType === "subtract" ? "Reducir Stock" : "Editar producto"}</DialogTitle>
           </DialogHeader>
           <form
             onSubmit={async (e) => {
@@ -201,6 +226,38 @@ export function InventoryList({ searchTerm }: InventoryListProps) {
               if (!itemToEdit) return
               
               const supabase = createClient()
+
+              if (adjustmentType === "add" || adjustmentType === "subtract") {
+                const cantidadAjuste = Number(adjustmentQuantity)
+                if (isNaN(cantidadAjuste) || cantidadAjuste <= 0) {
+                  alert("Ingresa una cantidad válida para ajustar el stock.")
+                  return
+                }
+                let nuevaCantidad = itemToEdit.quantity
+                if (adjustmentType === "add") {
+                  nuevaCantidad += cantidadAjuste
+                } else {
+                  nuevaCantidad -= cantidadAjuste
+                  if (nuevaCantidad < 0) nuevaCantidad = 0
+                }
+                const { error } = await supabase
+                  .from('inventory_items')
+                  .update({ quantity: nuevaCantidad })
+                  .eq('id', itemToEdit.id)
+                if (error) {
+                  alert('Error al actualizar: ' + error.message)
+                } else {
+                  setShowEditDialog(false)
+                  setItemToEdit(null)
+                  setAdjustmentQuantity("")
+                  // Refrescar lista
+                  const { data } = await supabase.from('inventory_items').select('*')
+                  setItems(data || [])
+                }
+                return
+              }
+
+              // Edición normal
               const { data, error } = await supabase
                 .from('inventory_items')
                 .update({ ...editForm, updated_at: new Date().toISOString() })
@@ -215,31 +272,89 @@ export function InventoryList({ searchTerm }: InventoryListProps) {
               }
             }}
           >
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="name" className="text-right">Nombre</Label>
-                <Input id="name" value={editForm.name || ''} onChange={(e) => setEditForm({...editForm, name: e.target.value})} className="col-span-3" />
+            {adjustmentType === "add" || adjustmentType === "subtract" ? (
+              <div>
+                <label className="block text-sm font-medium">Cantidad a {adjustmentType === "add" ? "agregar" : "reducir"}</label>
+                <input
+                  type="number"
+                  className="input input-bordered w-full"
+                  value={adjustmentQuantity}
+                  onChange={e => setAdjustmentQuantity(e.target.value)}
+                  min="1"
+                  required
+                />
+                <p className="text-xs text-muted-foreground mt-1">Stock actual: {itemToEdit?.quantity} {itemToEdit?.unit}</p>
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="description" className="text-right">Descripción</Label>
-                <Input id="description" value={editForm.description || ''} onChange={(e) => setEditForm({...editForm, description: e.target.value})} className="col-span-3" />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="unit" className="text-right">Unidad</Label>
-                <Input id="unit" value={editForm.unit || ''} onChange={(e) => setEditForm({...editForm, unit: e.target.value})} className="col-span-3" />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="quantity" className="text-right">Cantidad</Label>
-                <Input id="quantity" type="number" value={editForm.quantity || ''} onChange={(e) => setEditForm({...editForm, quantity: parseFloat(e.target.value)})} className="col-span-3" />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="min_quantity" className="text-right">Cant. Mínima</Label>
-                <Input id="min_quantity" type="number" value={editForm.min_quantity || ''} onChange={(e) => setEditForm({...editForm, min_quantity: parseFloat(e.target.value)})} className="col-span-3" />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="cost_per_unit" className="text-right">Costo/Unidad</Label>
-                <Input id="cost_per_unit" type="number" value={editForm.cost_per_unit || ''} onChange={(e) => setEditForm({...editForm, cost_per_unit: parseFloat(e.target.value)})} className="col-span-3" />
-              </div>
+            ) : (
+              <>
+                <div>
+                  <label className="block text-sm font-medium">Nombre</label>
+                  <input
+                    type="text"
+                    className="input input-bordered w-full"
+                    value={editForm.name}
+                    onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium">Descripción</label>
+                  <input
+                    type="text"
+                    className="input input-bordered w-full"
+                    value={editForm.description}
+                    onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium">Unidad</label>
+                  <input
+                    type="text"
+                    className="input input-bordered w-full"
+                    value={editForm.unit}
+                    onChange={e => setEditForm(f => ({ ...f, unit: e.target.value }))}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium">Cantidad</label>
+                  <input
+                    type="number"
+                    className="input input-bordered w-full"
+                    value={editForm.quantity}
+                    onChange={e => setEditForm(f => ({ ...f, quantity: Number(e.target.value) }))}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium">Cantidad mínima</label>
+                  <input
+                    type="number"
+                    className="input input-bordered w-full"
+                    value={editForm.min_quantity}
+                    onChange={e => setEditForm(f => ({ ...f, min_quantity: Number(e.target.value) }))}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium">Costo por unidad</label>
+                  <input
+                    type="number"
+                    className="input input-bordered w-full"
+                    value={editForm.cost_per_unit}
+                    onChange={e => setEditForm(f => ({ ...f, cost_per_unit: Number(e.target.value) }))}
+                    required
+                  />
+                </div>
+              </>
+            )}
+            <div className="flex justify-end gap-2">
+              <button type="button" className="btn" onClick={() => { setShowEditDialog(false); setAdjustmentQuantity(""); }}>
+                Cancelar
+              </button>
+              <button type="submit" className="btn btn-primary">
+                Guardar
+              </button>
             </div>
             <DialogFooter>
               <Button type="submit">Guardar Cambios</Button>

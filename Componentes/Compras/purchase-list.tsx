@@ -285,7 +285,34 @@ export function PurchaseList({ searchTerm }: PurchaseListProps) {
       if (error) {
         throw error
       }
-      
+
+      // Si el estado cambia a completed, actualizar inventario
+      if (selectedPurchase) {
+        const wasCompleted = selectedPurchase.status !== 'completed';
+        const willBeCompleted = editForm.status === 'completed';
+        if (!wasCompleted && willBeCompleted) {
+          // Obtener los productos de la compra
+          const { data: purchaseItems, error: itemsError } = await supabase
+            .from('purchase_items')
+            .select('id, inventory_item_id, quantity')
+            .eq('purchase_id', selectedPurchase.id);
+
+          if (itemsError) throw itemsError;
+
+          // Actualizar inventario para cada producto
+          for (const item of purchaseItems) {
+            console.log('Actualizando inventario:', item.inventory_item_id, item.quantity);
+            const { error: inventoryError } = await supabase.rpc('update_inventory_quantity', {
+              p_item_id: item.inventory_item_id,
+              p_quantity_change: item.quantity
+            });
+            if (inventoryError) {
+              console.error('Error actualizando inventario:', inventoryError);
+            }
+          }
+        }
+      }
+
       toast({
         title: "Compra eliminada",
         description: "La compra ha sido eliminada exitosamente."
