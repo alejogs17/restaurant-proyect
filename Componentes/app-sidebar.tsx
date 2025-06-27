@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
+import { useEffect, useState, Component, ReactNode } from "react"
 import {
   BarChart3,
   ChefHat,
@@ -14,7 +15,6 @@ import {
   Settings,
   ShoppingBasket,
   Users,
-  Building,
   DollarSign,
 } from "lucide-react"
 import { Button } from "@/Componentes/ui/button"
@@ -22,8 +22,66 @@ import { createClient } from "@/lib/supabase/client"
 import { useToast } from "@/Componentes/ui/use-toast"
 import { useUserRole } from "@/hooks/useUserRole"
 import { Skeleton } from "@/Componentes/ui/skeleton"
-import { Sheet, SheetContent } from "@/Componentes/ui/sheet"
+import { Sheet, SheetContent, SheetTitle } from "@/Componentes/ui/sheet"
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden"
+
+// Error Boundary Component
+class SidebarErrorBoundary extends Component<
+  { children: ReactNode },
+  { hasError: boolean }
+> {
+  constructor(props: { children: ReactNode }) {
+    super(props)
+    this.state = { hasError: false }
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true }
+  }
+
+  componentDidCatch(error: Error, errorInfo: any) {
+    console.error("Sidebar Error:", error, errorInfo)
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="relative flex flex-col h-screen min-h-screen bg-background">
+          <div className="flex items-center justify-between p-4 border-b">
+            <div className="flex items-center gap-2 font-semibold">
+              <Coffee className="h-6 w-6 text-orange-600" />
+              <span className="text-xl">RestaurantOS</span>
+            </div>
+          </div>
+          <div className="flex-1 p-4 overflow-y-auto">
+            <div className="text-center text-red-600">
+              <p>Error en el sidebar</p>
+              <Button 
+                onClick={() => this.setState({ hasError: false })} 
+                variant="outline" 
+                className="mt-2"
+              >
+                Reintentar
+              </Button>
+            </div>
+          </div>
+          <div className="absolute bottom-0 left-0 w-full p-4 border-t bg-background">
+            <Button
+              variant="ghost"
+              className="w-full flex items-center gap-2 p-2 rounded-md text-left hover:bg-gray-100 transition-colors"
+              onClick={() => window.location.reload()}
+            >
+              <LogOut className="h-4 w-4" />
+              <span>Recargar página</span>
+            </Button>
+          </div>
+        </div>
+      )
+    }
+
+    return this.props.children
+  }
+}
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["admin", "cashier", "chef", "waiter"] },
@@ -44,15 +102,26 @@ interface AppSidebarProps {
   onMobileClose: () => void
 }
 
-function SidebarContent() {
+function SidebarContent({ onLinkClick }: { onLinkClick?: () => void } = {}) {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
   const { toast } = useToast()
   const { role, loading } = useUserRole()
+  const [isMounted, setIsMounted] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
 
   const isActive = (path: string) => {
-    return pathname === path || pathname.startsWith(`${path}/`)
+    try {
+      return pathname === path || pathname.startsWith(`${path}/`)
+    } catch (err) {
+      console.error("Error checking active path:", err)
+      return false
+    }
   }
 
   const handleSignOut = async () => {
@@ -65,7 +134,8 @@ function SidebarContent() {
       })
       router.push("/auth/login")
     } catch (error) {
-      alert("Error signing out: " + (error instanceof Error ? error.message : String(error)))
+      console.error("Error signing out:", error)
+      setError("Error al cerrar sesión")
       toast({
         title: "Error",
         description: "No se pudo cerrar la sesión",
@@ -74,9 +144,79 @@ function SidebarContent() {
     }
   }
 
-  const userNavItems = navItems.filter(item => 
-    role && item.roles.includes(role)
-  )
+  const userNavItems = navItems.filter(item => {
+    try {
+      console.log("Checking item:", item.label, "User role:", role, "Required roles:", item.roles)
+      return role && item.roles.includes(role)
+    } catch (err) {
+      console.error("Error filtering nav items:", err)
+      return false
+    }
+  })
+
+  // Debug: Log current role and filtered items
+  console.log("Current user role:", role)
+  console.log("Filtered nav items:", userNavItems.map(item => item.label))
+
+  // Show loading state if not mounted or loading
+  if (!isMounted || loading) {
+    return (
+      <div className="relative flex flex-col h-screen min-h-screen">
+        <div className="flex items-center justify-between p-4 border-b">
+          <div className="flex items-center gap-2 font-semibold">
+            <Coffee className="h-6 w-6 text-orange-600" />
+            <span className="text-xl">RestaurantOS</span>
+          </div>
+        </div>
+        <div className="flex-1 p-4 overflow-y-auto">
+          <nav className="space-y-2">
+            {Array.from({ length: 10 }).map((_, i) => (
+              <Skeleton key={i} className="h-8 w-full" />
+            ))}
+          </nav>
+        </div>
+        <div className="absolute bottom-0 left-0 w-full p-4 border-t bg-background">
+          <Skeleton className="h-10 w-full" />
+        </div>
+      </div>
+    )
+  }
+
+  // Show error state if there's an error
+  if (error) {
+    return (
+      <div className="relative flex flex-col h-screen min-h-screen">
+        <div className="flex items-center justify-between p-4 border-b">
+          <div className="flex items-center gap-2 font-semibold">
+            <Coffee className="h-6 w-6 text-orange-600" />
+            <span className="text-xl">RestaurantOS</span>
+          </div>
+        </div>
+        <div className="flex-1 p-4 overflow-y-auto">
+          <div className="text-center text-red-600">
+            <p>Error: {error}</p>
+            <Button 
+              onClick={() => setError(null)} 
+              variant="outline" 
+              className="mt-2"
+            >
+              Reintentar
+            </Button>
+          </div>
+        </div>
+        <div className="absolute bottom-0 left-0 w-full p-4 border-t bg-background">
+          <Button
+            variant="ghost"
+            className="w-full flex items-center gap-2 p-2 rounded-md text-left hover:bg-gray-100 transition-colors"
+            onClick={handleSignOut}
+          >
+            <LogOut className="h-4 w-4" />
+            <span>Cerrar sesión</span>
+          </Button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="relative flex flex-col h-screen min-h-screen">
@@ -88,27 +228,22 @@ function SidebarContent() {
       </div>
       <div className="flex-1 p-4 overflow-y-auto">
         <nav className="space-y-2">
-          {loading ? (
-            Array.from({ length: 10 }).map((_, i) => (
-              <Skeleton key={i} className="h-8 w-full" />
-            ))
-          ) : (
-            userNavItems.map(item => {
-              const Icon = item.icon
-              return (
-                <Link 
-                  key={item.href}
-                  href={item.href}
-                  className={`flex items-center gap-2 p-2 rounded-md transition-colors ${
-                    isActive(item.href) ? "bg-orange-100 text-orange-700" : "hover:bg-gray-100"
-                  }`}
-                >
-                  <Icon className="h-4 w-4" />
-                  <span>{item.label}</span>
-                </Link>
-              )
-            })
-          )}
+          {userNavItems.map(item => {
+            const Icon = item.icon
+            return (
+              <Link 
+                key={item.href}
+                href={item.href}
+                onClick={onLinkClick}
+                className={`flex items-center gap-2 p-2 rounded-md transition-colors ${
+                  isActive(item.href) ? "bg-orange-100 text-orange-700" : "hover:bg-gray-100"
+                }`}
+              >
+                <Icon className="h-4 w-4" />
+                <span>{item.label}</span>
+              </Link>
+            )
+          })}
         </nav>
       </div>
       <div className="absolute bottom-0 left-0 w-full p-4 border-t bg-background">
@@ -130,18 +265,23 @@ export function AppSidebar({ isMobileOpen, onMobileClose }: AppSidebarProps) {
     <>
       {/* Desktop Sidebar */}
       <div className="hidden lg:flex w-64 flex-col border-r bg-background fixed top-0 left-0 h-screen z-30">
-        <SidebarContent />
+        <SidebarErrorBoundary>
+          <SidebarContent />
+        </SidebarErrorBoundary>
       </div>
-
       {/* Mobile Sidebar */}
       <Sheet open={isMobileOpen} onOpenChange={onMobileClose}>
-        <SheetContent side="left" className="w-64 p-0">
-          <VisuallyHidden>
-            <h2 id="sidebar-mobile-title">Menú de navegación</h2>
-          </VisuallyHidden>
-          <SidebarContent />
+        <SheetContent 
+          side="left" 
+          className="w-64 p-0" 
+          aria-labelledby="sidebar-mobile-title"
+        >
+          <SheetTitle className="sr-only">Menú de navegación</SheetTitle>
+          <SidebarErrorBoundary>
+            <SidebarContent onLinkClick={onMobileClose} />
+          </SidebarErrorBoundary>
         </SheetContent>
       </Sheet>
     </>
-  )
+  );
 }

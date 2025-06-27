@@ -8,12 +8,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/Componentes/ui/tabs"
 import { OrderList } from "@/Componentes/Ordenes/order-list"
 import { CreateOrderDialog } from "@/Componentes/Ordenes/create-order-dialog"
 import { OrderStatusFilter } from "@/Componentes/Ordenes/order-status-filter"
+import { useIsMounted } from "@/hooks/use-is-mounted"
 
 export default function OrdersPage() {
+  const isMounted = useIsMounted();
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [activeTab, setActiveTab] = useState("all")
+
+  if (!isMounted) return null;
 
   return (
     <div className="space-y-6">
@@ -43,10 +47,10 @@ export default function OrdersPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
+        <TabsList className="flex overflow-x-auto flex-nowrap whitespace-nowrap gap-2 px-1 no-scrollbar">
           <TabsTrigger value="all">Todos</TabsTrigger>
           <TabsTrigger value="pending">Pendientes</TabsTrigger>
-          <TabsTrigger value="preparing">En Preparación</TabsTrigger>
+          <TabsTrigger value="preparing">En preparación</TabsTrigger>
           <TabsTrigger value="ready">Listos</TabsTrigger>
           <TabsTrigger value="delivered">Entregados</TabsTrigger>
         </TabsList>

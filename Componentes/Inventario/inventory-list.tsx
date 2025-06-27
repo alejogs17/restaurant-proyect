@@ -34,7 +34,14 @@ export function InventoryList({ searchTerm }: InventoryListProps) {
   const [itemToDelete, setItemToDelete] = useState<InventoryItem | null>(null)
   const [showEditDialog, setShowEditDialog] = useState(false)
   const [itemToEdit, setItemToEdit] = useState<InventoryItem | null>(null)
-  const [editForm, setEditForm] = useState<Partial<InventoryItem>>({})
+  const [editForm, setEditForm] = useState<Partial<InventoryItem>>({
+    name: "",
+    description: "",
+    unit: "",
+    quantity: 0,
+    min_quantity: 0,
+    cost_per_unit: 0
+  })
   const [adjustmentType, setAdjustmentType] = useState<"add" | "subtract" | null>(null)
   const [adjustmentQuantity, setAdjustmentQuantity] = useState("")
 
@@ -292,7 +299,7 @@ export function InventoryList({ searchTerm }: InventoryListProps) {
                   <input
                     type="text"
                     className="input input-bordered w-full"
-                    value={editForm.name}
+                    value={editForm.name ?? ""}
                     onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
                     required
                   />
@@ -302,7 +309,7 @@ export function InventoryList({ searchTerm }: InventoryListProps) {
                   <input
                     type="text"
                     className="input input-bordered w-full"
-                    value={editForm.description}
+                    value={editForm.description ?? ""}
                     onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))}
                   />
                 </div>
@@ -311,7 +318,7 @@ export function InventoryList({ searchTerm }: InventoryListProps) {
                   <input
                     type="text"
                     className="input input-bordered w-full"
-                    value={editForm.unit}
+                    value={editForm.unit ?? ""}
                     onChange={e => setEditForm(f => ({ ...f, unit: e.target.value }))}
                     required
                   />
@@ -321,7 +328,7 @@ export function InventoryList({ searchTerm }: InventoryListProps) {
                   <input
                     type="number"
                     className="input input-bordered w-full"
-                    value={editForm.quantity}
+                    value={editForm.quantity ?? 0}
                     onChange={e => setEditForm(f => ({ ...f, quantity: Number(e.target.value) }))}
                     required
                   />
@@ -331,7 +338,7 @@ export function InventoryList({ searchTerm }: InventoryListProps) {
                   <input
                     type="number"
                     className="input input-bordered w-full"
-                    value={editForm.min_quantity}
+                    value={editForm.min_quantity ?? 0}
                     onChange={e => setEditForm(f => ({ ...f, min_quantity: Number(e.target.value) }))}
                     required
                   />
@@ -341,7 +348,7 @@ export function InventoryList({ searchTerm }: InventoryListProps) {
                   <input
                     type="number"
                     className="input input-bordered w-full"
-                    value={editForm.cost_per_unit}
+                    value={editForm.cost_per_unit ?? 0}
                     onChange={e => setEditForm(f => ({ ...f, cost_per_unit: Number(e.target.value) }))}
                     required
                   />

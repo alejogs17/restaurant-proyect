@@ -128,7 +128,7 @@ export function EditUserDialog({ user, open, onOpenChange, onUserEdited }: EditU
               </Label>
               <Input
                 id="firstName"
-                value={formData.firstName}
+                value={formData.firstName ?? ""}
                 onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, firstName: e.target.value })}
                 className="col-span-3"
               />
@@ -139,7 +139,7 @@ export function EditUserDialog({ user, open, onOpenChange, onUserEdited }: EditU
               </Label>
               <Input
                 id="lastName"
-                value={formData.lastName}
+                value={formData.lastName ?? ""}
                 onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, lastName: e.target.value })}
                 className="col-span-3"
               />
@@ -151,7 +151,7 @@ export function EditUserDialog({ user, open, onOpenChange, onUserEdited }: EditU
               <Input
                 id="email"
                 type="email"
-                value={formData.email}
+                value={formData.email ?? ""}
                 className="col-span-3"
                 disabled
               />
@@ -167,7 +167,7 @@ export function EditUserDialog({ user, open, onOpenChange, onUserEdited }: EditU
               <Label htmlFor="phone">Teléfono</Label>
               <Input
                 id="phone"
-                value={formData.phone}
+                value={formData.phone ?? ""}
                 onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, phone: e.target.value })}
                 placeholder="+57 300 123 4567"
               />
@@ -175,7 +175,7 @@ export function EditUserDialog({ user, open, onOpenChange, onUserEdited }: EditU
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="role">Rol *</Label>
-                <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value })}>
+                <Select value={formData.role ?? ""} onValueChange={(value) => setFormData({ ...formData, role: value })}>
                   <SelectTrigger>
                     <SelectValue placeholder="Seleccionar rol" />
                   </SelectTrigger>
@@ -189,7 +189,7 @@ export function EditUserDialog({ user, open, onOpenChange, onUserEdited }: EditU
               </div>
               <div className="space-y-2">
                 <Label htmlFor="status">Estado *</Label>
-                <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value })}>
+                <Select value={formData.status ?? ""} onValueChange={(value) => setFormData({ ...formData, status: value })}>
                   <SelectTrigger>
                     <SelectValue placeholder="Seleccionar estado" />
                   </SelectTrigger>

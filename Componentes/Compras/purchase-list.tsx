@@ -509,14 +509,14 @@ export function PurchaseList({ searchTerm }: PurchaseListProps) {
                   <Input 
                       id="purchase_date"
                       type="date" 
-                      value={editForm.purchase_date}
+                      value={editForm.purchase_date ?? ""}
                       onChange={e => setEditForm(prev => ({ ...prev, purchase_date: e.target.value }))}
                   />
               </div>
               <div>
                 <Label htmlFor="status">Estado</Label>
                 <Select
-                  value={editForm.status}
+                  value={editForm.status ?? "pending"}
                   onValueChange={(value: "completed" | "pending" | "cancelled") => setEditForm(prev => ({...prev, status: value}))}
                 >
                   <SelectTrigger>
@@ -533,7 +533,7 @@ export function PurchaseList({ searchTerm }: PurchaseListProps) {
                   <Label htmlFor="notes">Notas</Label>
                   <Textarea
                       id="notes"
-                      value={editForm.notes}
+                      value={editForm.notes ?? ""}
                       onChange={e => setEditForm(prev => ({ ...prev, notes: e.target.value }))}
                   />
               </div>

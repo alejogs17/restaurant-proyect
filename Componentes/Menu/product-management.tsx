@@ -271,7 +271,7 @@ export function ProductManagement({ searchTerm }: ProductManagementProps) {
               <input
                 type="text"
                 className="input input-bordered w-full"
-                value={editForm.name}
+                value={editForm.name ?? ""}
                 onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
                 required
               />
@@ -281,7 +281,7 @@ export function ProductManagement({ searchTerm }: ProductManagementProps) {
               <input
                 type="text"
                 className="input input-bordered w-full"
-                value={editForm.description}
+                value={editForm.description ?? ""}
                 onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))}
               />
             </div>
@@ -290,7 +290,7 @@ export function ProductManagement({ searchTerm }: ProductManagementProps) {
               <input
                 type="number"
                 className="input input-bordered w-full"
-                value={editForm.price}
+                value={editForm.price ?? 0}
                 onChange={e => setEditForm(f => ({ ...f, price: Number(e.target.value) }))}
                 required
               />

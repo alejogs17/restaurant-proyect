@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { AppSidebar } from "@/Componentes/app-sidebar"
 import { TopNav } from "@/Componentes/top-nav"
+import { DashboardSessionManager } from "@/Componentes/dashboard-session-manager"
 
 export default function DashboardLayout({
   children,
@@ -18,6 +19,7 @@ export default function DashboardLayout({
         <TopNav onMobileMenuClick={() => setIsSidebarOpen(true)} />
         <main className="flex-1 p-4 sm:p-6">{children}</main>
       </div>
+      <DashboardSessionManager />
     </div>
   )
 }

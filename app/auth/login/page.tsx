@@ -1,6 +1,7 @@
 "use client"
 
 import type React from "react"
+import { Suspense } from "react"
 
 import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -14,7 +15,7 @@ import { useToast } from "@/Componentes/ui/use-toast"
 import { Alert, AlertTitle, AlertDescription } from "@/Componentes/ui/alert"
 import { Session } from '@supabase/supabase-js'
 
-export default function LoginPage() {
+function LoginPageContent() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
@@ -193,5 +194,13 @@ export default function LoginPage() {
         <p className="text-xs text-muted-foreground">¿Necesitas ayuda? Contacta al administrador del sistema</p>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginPageContent />
+    </Suspense>
   )
 }
