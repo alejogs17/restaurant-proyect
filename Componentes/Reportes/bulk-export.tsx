@@ -7,12 +7,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/Componentes/ui/card"
 import { Checkbox } from "@/Componentes/ui/checkbox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/Componentes/ui/select"
 import { exportToCSV, exportToJSON } from "./export-utils"
+import { createClient } from "@/lib/supabase/client"
 
 export function BulkExport() {
   const [selectedReports, setSelectedReports] = useState<string[]>([])
   const [format, setFormat] = useState("csv")
   const [dateRange, setDateRange] = useState("30")
   const [isExporting, setIsExporting] = useState(false)
+  const supabase = createClient()
 
   const availableReports = [
     { id: "sales", name: "Reporte de Ventas", description: "Métricas de ventas y rendimiento" },
@@ -25,6 +27,146 @@ export function BulkExport() {
     setSelectedReports((prev) => (prev.includes(reportId) ? prev.filter((id) => id !== reportId) : [...prev, reportId]))
   }
 
+  // Función para obtener datos de ventas
+  const fetchSalesData = async () => {
+    const endDate = new Date()
+    const startDate = new Date()
+    startDate.setDate(startDate.getDate() - parseInt(dateRange))
+
+    const { data: orders, error: ordersError } = await supabase
+      .from('orders')
+      .select('total, status')
+      .gte('created_at', startDate.toISOString())
+      .lte('created_at', endDate.toISOString())
+      .eq('status', 'completed')
+
+    if (ordersError) throw ordersError
+
+    const totalVentas = orders?.reduce((acc: number, order: any) => acc + (order.total || 0), 0) || 0
+    const totalOrdenes = orders?.length || 0
+
+    const { data: payments, error: paymentsError } = await supabase
+      .from('payments')
+      .select('payment_method, amount')
+      .gte('payment_date', startDate.toISOString())
+      .lte('payment_date', endDate.toISOString())
+
+    if (paymentsError) throw paymentsError
+
+    const methodMap: Record<string, { metodo: string, monto: number }> = {}
+    let totalPaid = 0
+    payments?.forEach((p: any) => {
+      const method = p.payment_method
+      if (!methodMap[method]) methodMap[method] = { metodo: method, monto: 0 }
+      methodMap[method].monto += p.amount || 0
+      totalPaid += p.amount || 0
+    })
+
+    const metodosPago = Object.values(methodMap).map((m: any) => ({
+      ...m,
+      porcentaje: totalPaid > 0 ? Math.round((m.monto / totalPaid) * 100) : 0
+    }))
+
+    return {
+      resumen: { totalVentas, totalOrdenes },
+      metodosPago
+    }
+  }
+
+  // Función para obtener datos de productos
+  const fetchProductsData = async () => {
+    const endDate = new Date()
+    const startDate = new Date()
+    startDate.setDate(startDate.getDate() - parseInt(dateRange))
+
+    const { data: orderItems, error: orderItemsError } = await supabase
+      .from('order_items')
+      .select(`
+        quantity,
+        total_price,
+        products (name)
+      `)
+      .gte('created_at', startDate.toISOString())
+      .lte('created_at', endDate.toISOString())
+      .eq('status', 'delivered')
+
+    if (orderItemsError) throw orderItemsError
+
+    const productMap: Record<string, { producto: string, vendidos: number, ingresos: number }> = {}
+    orderItems?.forEach((item: any) => {
+      const productName = item.products?.name || 'Sin nombre'
+      if (!productMap[productName]) {
+        productMap[productName] = { producto: productName, vendidos: 0, ingresos: 0 }
+      }
+      productMap[productName].vendidos += item.quantity || 0
+      productMap[productName].ingresos += item.total_price || 0
+    })
+
+    const masVendidos = Object.values(productMap)
+      .sort((a: any, b: any) => b.vendidos - a.vendidos)
+      .slice(0, 10)
+
+    return { masVendidos }
+  }
+
+  // Función para obtener datos de inventario
+  const fetchInventoryData = async () => {
+    const { data: inventoryStats, error: statsError } = await supabase.rpc("get_inventory_stats")
+    if (statsError) throw statsError
+
+    const { data: lowStockItems, error: lowStockError } = await supabase.rpc("get_low_stock_items")
+    if (lowStockError) throw lowStockError
+
+    const resumen = {
+      valorTotal: inventoryStats?.[0]?.total_value || 0,
+      totalItems: inventoryStats?.[0]?.total_items || 0
+    }
+
+    const alertas = lowStockItems?.map((item: any) => ({
+      item: item.name,
+      stock: item.quantity,
+      minimo: item.min_quantity
+    })) || []
+
+    return { resumen, alertas }
+  }
+
+  // Función para obtener datos de compras
+  const fetchPurchasesData = async () => {
+    const endDate = new Date()
+    const startDate = new Date()
+    startDate.setDate(startDate.getDate() - parseInt(dateRange))
+
+    const { data: purchases, error: purchasesError } = await supabase
+      .from('purchases')
+      .select('total_amount, suppliers(name)')
+      .gte('purchase_date', startDate.toISOString())
+      .lte('purchase_date', endDate.toISOString())
+
+    if (purchasesError) throw purchasesError
+
+    const totalGastado = purchases?.reduce((acc: number, p: any) => acc + (p.total_amount || 0), 0) || 0
+    const totalOrdenes = purchases?.length || 0
+
+    const supplierMap: Record<string, { proveedor: string, gastado: number }> = {}
+    purchases?.forEach((p: any) => {
+      const supplierName = p.suppliers?.name || 'Sin proveedor'
+      if (!supplierMap[supplierName]) {
+        supplierMap[supplierName] = { proveedor: supplierName, gastado: 0 }
+      }
+      supplierMap[supplierName].gastado += p.total_amount || 0
+    })
+
+    const proveedores = Object.values(supplierMap)
+      .sort((a: any, b: any) => b.gastado - a.gastado)
+      .slice(0, 10)
+
+    return {
+      resumen: { totalGastado, totalOrdenes },
+      proveedores
+    }
+  }
+
   const handleBulkExport = async () => {
     if (selectedReports.length === 0) return
 
@@ -32,44 +174,38 @@ export function BulkExport() {
 
     try {
       const timestamp = new Date().toISOString().split("T")[0]
+      const reportsData: Record<string, any> = {}
 
-      // Datos de ejemplo para cada reporte
-      const reportsData = {
-        sales: {
-          resumen: { totalVentas: 45680000, totalOrdenes: 1247 },
-          metodosPago: [
-            { metodo: "Efectivo", monto: 18272000, porcentaje: 40 },
-            { metodo: "Tarjeta Crédito", monto: 13704000, porcentaje: 30 },
-          ],
-        },
-        products: {
-          masVendidos: [
-            { producto: "Hamburguesa de Res", vendidos: 245, ingresos: 15670200 },
-            { producto: "Pasta Carbonara", vendidos: 189, ingresos: 12844044 },
-          ],
-        },
-        inventory: {
-          resumen: { valorTotal: 15420000, totalItems: 45 },
-          alertas: [{ item: "Queso Mozzarella", stock: 8, minimo: 15 }],
-        },
-        purchases: {
-          resumen: { totalGastado: 12450000, totalOrdenes: 45 },
-          proveedores: [{ proveedor: "Distribuidora Central", gastado: 4580000 }],
-        },
+      // Obtener datos reales para cada reporte seleccionado
+      for (const reportId of selectedReports) {
+        switch (reportId) {
+          case "sales":
+            reportsData.sales = await fetchSalesData()
+            break
+          case "products":
+            reportsData.products = await fetchProductsData()
+            break
+          case "inventory":
+            reportsData.inventory = await fetchInventoryData()
+            break
+          case "purchases":
+            reportsData.purchases = await fetchPurchasesData()
+            break
+        }
       }
 
       // Exportar cada reporte seleccionado
       for (const reportId of selectedReports) {
-        const data = reportsData[reportId as keyof typeof reportsData]
+        const data = reportsData[reportId]
         const filename = `${reportId}_${timestamp}`
 
         if (format === "csv") {
           // Convertir datos a formato plano para CSV
           const flatData = Object.entries(data).flatMap(([section, items]) => {
             if (Array.isArray(items)) {
-              return items.map((item) => ({ seccion: section, ...item }))
+              return items.map((item: any) => ({ seccion: section, ...item }))
             } else {
-              return [{ seccion: section, ...items }]
+              return [{ seccion: section, ...(items as Record<string, any>) }]
             }
           })
           exportToCSV(flatData, filename)

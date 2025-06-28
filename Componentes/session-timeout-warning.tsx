@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { usePathname } from "next/navigation"
 import { Button } from "@/Componentes/ui/button"
 import {
@@ -11,7 +11,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/Componentes/ui/dialog"
-import { useSessionTimeout } from "@/hooks/use-session-timeout"
 import { createClient } from "@/lib/supabase/client"
 
 interface SessionTimeoutWarningProps {
@@ -20,13 +19,15 @@ interface SessionTimeoutWarningProps {
 }
 
 export function SessionTimeoutWarning({ 
-  warningMinutes = 5, 
-  timeoutMinutes = 30 
+  warningMinutes = 30, 
+  timeoutMinutes = 120 
 }: SessionTimeoutWarningProps) {
   const [showWarning, setShowWarning] = useState(false)
   const [timeLeft, setTimeLeft] = useState(warningMinutes * 60)
   const pathname = usePathname()
   const supabase = createClient()
+  const timeoutRef = useRef<NodeJS.Timeout>()
+  const warningTimeoutRef = useRef<NodeJS.Timeout>()
 
   // Solo activar en páginas del dashboard
   const isDashboardPage = pathname?.startsWith('/dashboard')
@@ -36,14 +37,42 @@ export function SessionTimeoutWarning({
     return null
   }
 
+  const resetTimers = () => {
+    // Limpiar timers existentes
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current)
+    }
+    if (warningTimeoutRef.current) {
+      clearTimeout(warningTimeoutRef.current)
+    }
+    
+    // Ocultar advertencia si está visible
+    setShowWarning(false)
+    setTimeLeft(warningMinutes * 60)
+
+    // Configurar timer de advertencia (timeoutMinutes - warningMinutes antes del logout)
+    warningTimeoutRef.current = setTimeout(() => {
+      setShowWarning(true)
+    }, (timeoutMinutes - warningMinutes) * 60 * 1000)
+
+    // Configurar timer de logout
+    timeoutRef.current = setTimeout(async () => {
+      try {
+        await supabase.auth.signOut()
+        console.log("Sesión cerrada por inactividad")
+      } catch (error) {
+        console.error("Error al cerrar sesión por inactividad:", error)
+      }
+    }, timeoutMinutes * 60 * 1000)
+  }
+
   const handleExtendSession = async () => {
     try {
       // Refrescar la sesión
       const { data: { session } } = await supabase.auth.getSession()
       if (session) {
         await supabase.auth.refreshSession()
-        setShowWarning(false)
-        setTimeLeft(warningMinutes * 60)
+        resetTimers() // Reiniciar todos los timers
       }
     } catch (error) {
       console.error("Error al extender la sesión:", error)
@@ -58,12 +87,37 @@ export function SessionTimeoutWarning({
     }
   }
 
-  useSessionTimeout({
-    timeoutMinutes: timeoutMinutes - warningMinutes, // Mostrar advertencia 5 minutos antes
-    onTimeout: () => {
-      setShowWarning(true)
+  useEffect(() => {
+    const handleActivity = () => {
+      resetTimers()
     }
-  })
+
+    // Eventos que indican actividad del usuario
+    const events = [
+      'mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'
+    ]
+
+    // Agregar event listeners
+    events.forEach(event => {
+      document.addEventListener(event, handleActivity, true)
+    })
+
+    // Iniciar los timers
+    resetTimers()
+
+    // Cleanup
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current)
+      }
+      if (warningTimeoutRef.current) {
+        clearTimeout(warningTimeoutRef.current)
+      }
+      events.forEach(event => {
+        document.removeEventListener(event, handleActivity, true)
+      })
+    }
+  }, [timeoutMinutes, warningMinutes])
 
   useEffect(() => {
     if (showWarning && timeLeft > 0) {
@@ -93,7 +147,7 @@ export function SessionTimeoutWarning({
         <DialogHeader>
           <DialogTitle>Sesión por expirar</DialogTitle>
           <DialogDescription>
-            Tu sesión expirará en {formatTime(timeLeft)} minutos por inactividad.
+            Tu sesión expirará en {formatTime(timeLeft)} por inactividad.
             ¿Deseas continuar con la sesión activa?
           </DialogDescription>
         </DialogHeader>

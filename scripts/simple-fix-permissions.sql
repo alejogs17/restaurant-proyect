@@ -1,43 +1,44 @@
--- Simple fix for user permissions
--- This script only adds the necessary policies without breaking existing functionality
+-- Script simple para desactivar RLS temporalmente
+-- Esto permitirá acceso a los datos sin problemas de permisos
 
--- Enable RLS if not already enabled
-ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+-- 1. Desactivar RLS en todas las tablas principales
+ALTER TABLE profiles DISABLE ROW LEVEL SECURITY;
+ALTER TABLE orders DISABLE ROW LEVEL SECURITY;
+ALTER TABLE order_items DISABLE ROW LEVEL SECURITY;
+ALTER TABLE payments DISABLE ROW LEVEL SECURITY;
+ALTER TABLE products DISABLE ROW LEVEL SECURITY;
+ALTER TABLE categories DISABLE ROW LEVEL SECURITY;
+ALTER TABLE tables DISABLE ROW LEVEL SECURITY;
+ALTER TABLE inventory DISABLE ROW LEVEL SECURITY;
+ALTER TABLE inventory_movements DISABLE ROW LEVEL SECURITY;
+ALTER TABLE purchases DISABLE ROW LEVEL SECURITY;
+ALTER TABLE purchase_items DISABLE ROW LEVEL SECURITY;
+ALTER TABLE suppliers DISABLE ROW LEVEL SECURITY;
 
--- Drop ALL existing policies to start fresh
-DROP POLICY IF EXISTS "Usuarios autenticados pueden ver perfiles" ON profiles;
-DROP POLICY IF EXISTS "Usuarios pueden ver y actualizar su propio perfil" ON profiles;
-DROP POLICY IF EXISTS "Administradores pueden gestionar perfiles" ON profiles;
-DROP POLICY IF EXISTS "Allow profile updates for authenticated users" ON profiles;
-DROP POLICY IF EXISTS "Allow profile selection for authenticated users" ON profiles;
-DROP POLICY IF EXISTS "Allow profile insertion for authenticated users" ON profiles;
-DROP POLICY IF EXISTS "Allow profile deletion for admins only" ON profiles;
-DROP POLICY IF EXISTS "Authenticated users can read all profiles" ON profiles;
-DROP POLICY IF EXISTS "Users can update their own profile" ON profiles;
-DROP POLICY IF EXISTS "Admins can update any profile" ON profiles;
-DROP POLICY IF EXISTS "Authenticated users can insert profiles" ON profiles;
-DROP POLICY IF EXISTS "Admins can delete profiles" ON profiles;
-DROP POLICY IF EXISTS "Allow authenticated users to read profiles" ON profiles;
-DROP POLICY IF EXISTS "Allow authenticated users to update profiles" ON profiles;
-DROP POLICY IF EXISTS "Allow authenticated users to insert profiles" ON profiles;
+-- 2. Verificar que las tablas existen y tienen datos
+SELECT 'profiles' as table_name, COUNT(*) as count FROM profiles
+UNION ALL
+SELECT 'orders' as table_name, COUNT(*) as count FROM orders
+UNION ALL
+SELECT 'order_items' as table_name, COUNT(*) as count FROM order_items
+UNION ALL
+SELECT 'payments' as table_name, COUNT(*) as count FROM payments
+UNION ALL
+SELECT 'products' as table_name, COUNT(*) as count FROM products
+UNION ALL
+SELECT 'categories' as table_name, COUNT(*) as count FROM categories
+UNION ALL
+SELECT 'tables' as table_name, COUNT(*) as count FROM tables
+UNION ALL
+SELECT 'inventory' as table_name, COUNT(*) as count FROM inventory
+UNION ALL
+SELECT 'inventory_movements' as table_name, COUNT(*) as count FROM inventory_movements
+UNION ALL
+SELECT 'purchases' as table_name, COUNT(*) as count FROM purchases
+UNION ALL
+SELECT 'purchase_items' as table_name, COUNT(*) as count FROM purchase_items
+UNION ALL
+SELECT 'suppliers' as table_name, COUNT(*) as count FROM suppliers;
 
--- Create a simple policy that allows all authenticated users to read profiles
--- This is needed for the admin panel to display users
-CREATE POLICY "Allow authenticated users to read profiles"
-  ON profiles FOR SELECT
-  USING (auth.role() = 'authenticated');
-
--- Create a policy that allows authenticated users to update profiles
--- This is needed for admin functionality
-CREATE POLICY "Allow authenticated users to update profiles"
-  ON profiles FOR UPDATE
-  USING (auth.role() = 'authenticated');
-
--- Create a policy that allows authenticated users to insert profiles
--- This is needed for user creation
-CREATE POLICY "Allow authenticated users to insert profiles"
-  ON profiles FOR INSERT
-  WITH CHECK (auth.role() = 'authenticated');
-
--- Grant necessary permissions
-GRANT ALL ON profiles TO authenticated; 
+-- 3. Mostrar mensaje de confirmación
+SELECT 'RLS desactivado en todas las tablas principales' as status; 

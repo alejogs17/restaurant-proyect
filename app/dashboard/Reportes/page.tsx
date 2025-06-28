@@ -11,10 +11,14 @@ import { ProductsReport } from "@/Componentes/Reportes/products-report"
 import { ExportDropdown } from "@/Componentes/Reportes/export-dropdown"
 import { DateRangePicker } from "@/Componentes/Reportes/date-range-picker"
 import { BulkExport } from "@/Componentes/Reportes/bulk-export"
+import { useReportsData } from "@/hooks/use-reports-data"
+import { Skeleton } from "@/Componentes/ui/skeleton"
 
 export default function ReportsPage() {
   const [startDate, setStartDate] = useState<Date>(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000))
   const [endDate, setEndDate] = useState<Date>(new Date())
+
+  const { summaryData, loading, error } = useReportsData(startDate, endDate)
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("es-CO", {
@@ -33,17 +37,25 @@ export default function ReportsPage() {
     setEndDate(newEndDate)
   }
 
-  // Datos de resumen para el período seleccionado
-  const summaryData = {
-    totalSales: 45680000,
-    totalOrders: 1247,
-    totalPurchases: 12450000,
-    inventoryValue: 15420000,
-    salesGrowth: 12.5,
-    ordersGrowth: 8.3,
-    purchasesGrowth: -5.2,
-    inventoryGrowth: 3.1,
-    period: formatDateRange(),
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-col lg:flex-row lg:justify-between lg:items-start gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Reportes y Análisis</h1>
+            <p className="text-gray-600">Análisis detallado del rendimiento del restaurante</p>
+          </div>
+        </div>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-center text-red-600">
+              <p>Error al cargar los datos: {error}</p>
+              <p className="text-sm text-gray-500 mt-2">Verifica tu conexión a internet y vuelve a intentar</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   return (
@@ -84,10 +96,18 @@ export default function ReportsPage() {
             <DollarSign className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{formatCurrency(summaryData.totalSales)}</div>
-            <p className="text-xs text-muted-foreground">
-              <span className="text-green-600">+{summaryData.salesGrowth}%</span> vs período anterior
-            </p>
+            {loading ? (
+              <Skeleton className="h-8 w-32" />
+            ) : (
+              <>
+                <div className="text-2xl font-bold text-green-600">{formatCurrency(summaryData.totalSales)}</div>
+                <p className="text-xs text-muted-foreground">
+                  <span className={summaryData.salesGrowth >= 0 ? "text-green-600" : "text-red-600"}>
+                    {summaryData.salesGrowth >= 0 ? "+" : ""}{summaryData.salesGrowth.toFixed(1)}%
+                  </span> vs período anterior
+                </p>
+              </>
+            )}
           </CardContent>
         </Card>
 
@@ -97,10 +117,18 @@ export default function ReportsPage() {
             <ShoppingCart className="h-4 w-4 text-blue-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-blue-600">{summaryData.totalOrders.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">
-              <span className="text-green-600">+{summaryData.ordersGrowth}%</span> vs período anterior
-            </p>
+            {loading ? (
+              <Skeleton className="h-8 w-32" />
+            ) : (
+              <>
+                <div className="text-2xl font-bold text-blue-600">{summaryData.totalOrders.toLocaleString()}</div>
+                <p className="text-xs text-muted-foreground">
+                  <span className={summaryData.ordersGrowth >= 0 ? "text-green-600" : "text-red-600"}>
+                    {summaryData.ordersGrowth >= 0 ? "+" : ""}{summaryData.ordersGrowth.toFixed(1)}%
+                  </span> vs período anterior
+                </p>
+              </>
+            )}
           </CardContent>
         </Card>
 
@@ -110,10 +138,18 @@ export default function ReportsPage() {
             <Package className="h-4 w-4 text-orange-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-600">{formatCurrency(summaryData.totalPurchases)}</div>
-            <p className="text-xs text-muted-foreground">
-              <span className="text-red-600">{summaryData.purchasesGrowth}%</span> vs período anterior
-            </p>
+            {loading ? (
+              <Skeleton className="h-8 w-32" />
+            ) : (
+              <>
+                <div className="text-2xl font-bold text-orange-600">{formatCurrency(summaryData.totalPurchases)}</div>
+                <p className="text-xs text-muted-foreground">
+                  <span className={summaryData.purchasesGrowth >= 0 ? "text-green-600" : "text-red-600"}>
+                    {summaryData.purchasesGrowth >= 0 ? "+" : ""}{summaryData.purchasesGrowth.toFixed(1)}%
+                  </span> vs período anterior
+                </p>
+              </>
+            )}
           </CardContent>
         </Card>
 
@@ -123,10 +159,18 @@ export default function ReportsPage() {
             <TrendingUp className="h-4 w-4 text-purple-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-purple-600">{formatCurrency(summaryData.inventoryValue)}</div>
-            <p className="text-xs text-muted-foreground">
-              <span className="text-green-600">+{summaryData.inventoryGrowth}%</span> vs período anterior
-            </p>
+            {loading ? (
+              <Skeleton className="h-8 w-32" />
+            ) : (
+              <>
+                <div className="text-2xl font-bold text-purple-600">{formatCurrency(summaryData.inventoryValue)}</div>
+                <p className="text-xs text-muted-foreground">
+                  <span className={summaryData.inventoryGrowth >= 0 ? "text-green-600" : "text-red-600"}>
+                    {summaryData.inventoryGrowth >= 0 ? "+" : ""}{summaryData.inventoryGrowth.toFixed(1)}%
+                  </span> vs período anterior
+                </p>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>

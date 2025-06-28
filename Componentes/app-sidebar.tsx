@@ -40,52 +40,27 @@ class SidebarErrorBoundary extends Component<
   }
 
   componentDidCatch(error: Error, errorInfo: any) {
-    console.error("Sidebar Error:", error, errorInfo)
+    console.error("Sidebar error:", error, errorInfo)
   }
 
   render() {
     if (this.state.hasError) {
       return (
-        <div className="relative flex flex-col h-screen min-h-screen bg-background">
-          <div className="flex items-center justify-between p-4 border-b">
-            <div className="flex items-center gap-2 font-semibold">
-              <Coffee className="h-6 w-6 text-orange-600" />
-              <span className="text-xl">RestaurantOS</span>
-            </div>
-          </div>
-          <div className="flex-1 p-4 overflow-y-auto">
-            <div className="text-center text-red-600">
-              <p>Error en el sidebar</p>
-              <Button 
-                onClick={() => this.setState({ hasError: false })} 
-                variant="outline" 
-                className="mt-2"
-              >
-                Reintentar
-              </Button>
-            </div>
-          </div>
-          <div className="absolute bottom-0 left-0 w-full p-4 border-t bg-background">
-            <Button
-              variant="ghost"
-              className="w-full flex items-center gap-2 p-2 rounded-md text-left hover:bg-gray-100 transition-colors"
-              onClick={() => window.location.reload()}
-            >
-              <LogOut className="h-4 w-4" />
-              <span>Recargar página</span>
-            </Button>
-          </div>
+        <div className="p-4 text-center text-red-600">
+          <p>Error en la barra lateral</p>
+          <Button onClick={() => this.setState({ hasError: false })} variant="outline" className="mt-2">
+            Reintentar
+          </Button>
         </div>
       )
     }
-
     return this.props.children
   }
 }
 
 const navItems = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["admin", "cashier", "chef", "waiter"] },
-  { href: "/dashboard/tables", label: "Mesas", icon: Home, roles: ["admin", "cashier", "chef", "waiter"] },
+  { href: "/dashboard", label: "Dashboard", icon: Home, roles: ["admin", "cashier", "chef", "waiter"] },
+  { href: "/dashboard/tables", label: "Mesas", icon: Coffee, roles: ["admin", "waiter", "cashier"] },
   { href: "/dashboard/orders", label: "Ordenes", icon: ClipboardList, roles: ["admin", "cashier", "chef", "waiter"] },
   { href: "/dashboard/Facturacion", label: "Facturacion", icon: DollarSign, roles: ["admin", "cashier"] },
   { href: "/dashboard/menu", label: "Menu", icon: Coffee, roles: ["admin", "chef", "waiter", "cashier"] },
@@ -108,12 +83,7 @@ function SidebarContent({ onLinkClick }: { onLinkClick?: () => void } = {}) {
   const supabase = createClient()
   const { toast } = useToast()
   const { role, loading } = useUserRole()
-  const [isMounted, setIsMounted] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    setIsMounted(true)
-  }, [])
 
   const isActive = (path: string) => {
     try {
@@ -146,7 +116,6 @@ function SidebarContent({ onLinkClick }: { onLinkClick?: () => void } = {}) {
 
   const userNavItems = navItems.filter(item => {
     try {
-      console.log("Checking item:", item.label, "User role:", role, "Required roles:", item.roles)
       return role && item.roles.includes(role)
     } catch (err) {
       console.error("Error filtering nav items:", err)
@@ -154,12 +123,8 @@ function SidebarContent({ onLinkClick }: { onLinkClick?: () => void } = {}) {
     }
   })
 
-  // Debug: Log current role and filtered items
-  console.log("Current user role:", role)
-  console.log("Filtered nav items:", userNavItems.map(item => item.label))
-
-  // Show loading state if not mounted or loading
-  if (!isMounted || loading) {
+  // Show loading state if loading
+  if (loading) {
     return (
       <div className="relative flex flex-col h-screen min-h-screen">
         <div className="flex items-center justify-between p-4 border-b">

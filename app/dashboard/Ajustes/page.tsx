@@ -43,7 +43,7 @@ export default function SettingsPage() {
 
   const [securitySettings, setSecuritySettings] = useState({
     twoFactorAuth: false,
-    sessionTimeout: "30",
+    sessionTimeout: "120",
     passwordExpiry: "90",
     loginAttempts: "5",
     ipWhitelist: "",

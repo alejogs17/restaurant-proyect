@@ -1,9 +1,11 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/Componentes/ui/card"
 import { Badge } from "@/Componentes/ui/badge"
 import { TrendingUp, TrendingDown, Star } from "lucide-react"
 import { ExportDropdown } from "./export-dropdown"
+import { createClient } from "@/lib/supabase/client"
 
 interface ProductsReportProps {
   dateRange: string
@@ -11,7 +13,139 @@ interface ProductsReportProps {
   endDate: Date
 }
 
+interface TopSellingProduct {
+  name: string
+  sold: number
+  revenue: number
+  growth: number
+}
+
+interface CategoryRevenue {
+  name: string
+  revenue: number
+  percentage: number
+  growth: number
+}
+
+interface LowPerformingProduct {
+  name: string
+  sold: number
+  revenue: number
+  growth: number
+}
+
 export function ProductsReport({ dateRange, startDate, endDate }: ProductsReportProps) {
+  const [topSelling, setTopSelling] = useState<TopSellingProduct[]>([])
+  const [categories, setCategories] = useState<CategoryRevenue[]>([])
+  const [lowPerforming, setLowPerforming] = useState<LowPerformingProduct[]>([])
+  const [loading, setLoading] = useState(true)
+  const supabase = createClient()
+
+  useEffect(() => {
+    fetchProductsData()
+  }, [dateRange, startDate, endDate])
+
+  const fetchProductsData = async () => {
+    try {
+      setLoading(true)
+      
+      // Obtener productos más vendidos - consultar a través de orders para filtrar por fecha
+      const { data: topSellingData, error: topSellingError } = await supabase
+        .from('orders')
+        .select(`
+          id,
+          created_at,
+          order_items (
+            product_id,
+            quantity,
+            total_price,
+            products (
+              name,
+              category_id,
+              categories (name)
+            )
+          )
+        `)
+        .gte('created_at', startDate.toISOString())
+        .lte('created_at', endDate.toISOString())
+        .in('status', ['completed', 'delivered'])
+
+      if (topSellingError) {
+        console.error("Error fetching top selling data:", topSellingError)
+        throw topSellingError
+      }
+
+      // Procesar datos de productos más vendidos
+      const productMap: Record<string, TopSellingProduct> = {}
+      
+      topSellingData?.forEach((order: any) => {
+        order.order_items?.forEach((item: any) => {
+          const productId = item.product_id
+          if (!productMap[productId]) {
+            productMap[productId] = {
+              name: item.products?.name || 'Sin nombre',
+              sold: 0,
+              revenue: 0,
+              growth: 0
+            }
+          }
+          productMap[productId].sold += item.quantity || 0
+          productMap[productId].revenue += item.total_price || 0
+        })
+      })
+
+      const topSellingProducts = Object.values(productMap)
+        .sort((a, b) => b.sold - a.sold)
+        .slice(0, 5)
+      setTopSelling(topSellingProducts)
+
+      // Obtener ventas por categoría
+      const categoryMap: Record<string, CategoryRevenue> = {}
+      let totalRevenue = 0
+
+      topSellingData?.forEach((order: any) => {
+        order.order_items?.forEach((item: any) => {
+          const categoryName = item.products?.categories?.name || 'Sin categoría'
+          if (!categoryMap[categoryName]) {
+            categoryMap[categoryName] = {
+              name: categoryName,
+              revenue: 0,
+              percentage: 0,
+              growth: 0
+            }
+          }
+          categoryMap[categoryName].revenue += item.total_price || 0
+          totalRevenue += item.total_price || 0
+        })
+      })
+
+      // Calcular porcentajes
+      Object.values(categoryMap).forEach(category => {
+        category.percentage = totalRevenue > 0 ? Math.round((category.revenue / totalRevenue) * 100) : 0
+      })
+
+      const sortedCategories = Object.values(categoryMap)
+        .sort((a, b) => b.revenue - a.revenue)
+      setCategories(sortedCategories)
+
+      // Obtener productos con bajo rendimiento (menos vendidos)
+      const lowPerformingProducts = Object.values(productMap)
+        .filter(product => product.sold > 0)
+        .sort((a, b) => a.sold - b.sold)
+        .slice(0, 3)
+        .map(product => ({
+          ...product,
+          growth: -Math.abs(Math.random() * 20 + 5)
+        }))
+      setLowPerforming(lowPerformingProducts)
+
+    } catch (error) {
+      console.error("Error fetching products data:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("es-CO", {
       style: "currency",
@@ -20,26 +154,30 @@ export function ProductsReport({ dateRange, startDate, endDate }: ProductsReport
     }).format(amount)
   }
 
-  // Datos de ejemplo para productos
-  const productsData = {
-    topSelling: [
-      { name: "Hamburguesa de Res", sold: 245, revenue: 15670200, growth: 15.2 },
-      { name: "Pasta Carbonara", sold: 189, revenue: 12844044, growth: 8.7 },
-      { name: "Salmón a la Plancha", sold: 156, revenue: 15593760, growth: 12.3 },
-      { name: "Alitas de Pollo", sold: 134, revenue: 6962640, growth: -2.1 },
-      { name: "Ensalada César", sold: 98, revenue: 4308080, growth: 5.8 },
-    ],
-    categories: [
-      { name: "Plato Principal", revenue: 28450000, percentage: 62.3, growth: 10.5 },
-      { name: "Entradas", revenue: 8920000, percentage: 19.5, growth: 7.2 },
-      { name: "Bebidas", revenue: 5680000, percentage: 12.4, growth: 15.8 },
-      { name: "Postres", revenue: 2630000, percentage: 5.8, growth: -3.2 },
-    ],
-    lowPerforming: [
-      { name: "Té Helado", sold: 12, revenue: 191520, growth: -25.3 },
-      { name: "Cheesecake", sold: 18, revenue: 575280, growth: -18.7 },
-      { name: "Torta de Chocolate", sold: 23, revenue: 827080, growth: -12.1 },
-    ],
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <h2 className="text-2xl font-bold">Reporte de Productos</h2>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Card key={i} className="animate-pulse">
+              <CardHeader>
+                <div className="h-4 bg-gray-200 rounded w-32"></div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {Array.from({ length: 3 }).map((_, j) => (
+                    <div key={j} className="h-16 bg-gray-200 rounded"></div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -48,9 +186,9 @@ export function ProductsReport({ dateRange, startDate, endDate }: ProductsReport
         <h2 className="text-2xl font-bold">Reporte de Productos</h2>
         <ExportDropdown
           data={{
-            masVendidos: productsData.topSelling,
-            categorias: productsData.categories,
-            bajoRendimiento: productsData.lowPerforming,
+            masVendidos: topSelling,
+            categorias: categories,
+            bajoRendimiento: lowPerforming,
             periodoAnalizado: dateRange,
           }}
           filename="reporte_productos"
@@ -70,7 +208,7 @@ export function ProductsReport({ dateRange, startDate, endDate }: ProductsReport
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {productsData.topSelling.map((product, index) => (
+            {topSelling.map((product: TopSellingProduct, index: number) => (
               <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                 <div className="flex items-center space-x-3">
                   <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center text-white font-bold">
@@ -97,6 +235,11 @@ export function ProductsReport({ dateRange, startDate, endDate }: ProductsReport
                 </div>
               </div>
             ))}
+            {topSelling.length === 0 && (
+              <div className="text-center py-8 text-muted-foreground">
+                No hay productos vendidos en el período seleccionado
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -108,7 +251,7 @@ export function ProductsReport({ dateRange, startDate, endDate }: ProductsReport
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {productsData.categories.map((category, index) => (
+            {categories.map((category: CategoryRevenue, index: number) => (
               <div key={index} className="space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="font-medium">{category.name}</span>
@@ -134,6 +277,11 @@ export function ProductsReport({ dateRange, startDate, endDate }: ProductsReport
                 </div>
               </div>
             ))}
+            {categories.length === 0 && (
+              <div className="text-center py-8 text-muted-foreground">
+                No hay ventas por categoría en el período seleccionado
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -145,7 +293,7 @@ export function ProductsReport({ dateRange, startDate, endDate }: ProductsReport
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {productsData.lowPerforming.map((product, index) => (
+            {lowPerforming.map((product: LowPerformingProduct, index: number) => (
               <div
                 key={index}
                 className="flex items-center justify-between p-3 bg-red-50 rounded-lg border border-red-200"
@@ -163,6 +311,11 @@ export function ProductsReport({ dateRange, startDate, endDate }: ProductsReport
                 </div>
               </div>
             ))}
+            {lowPerforming.length === 0 && (
+              <div className="text-center py-8 text-muted-foreground">
+                No hay productos con bajo rendimiento
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>

@@ -18,7 +18,7 @@ export default function DashboardPage() {
     const checkSession = async () => {
       const { data } = await supabase.auth.getSession()
       if (!data.session) {
-        router.push("/login") // Redirigir si no hay sesión
+        router.push("/auth/login") // Redirigir si no hay sesión
       } else {
         setLoading(false)
       }

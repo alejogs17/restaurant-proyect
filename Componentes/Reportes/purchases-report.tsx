@@ -4,6 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/Componentes/ui/card"
 import { Badge } from "@/Componentes/ui/badge"
 import { TrendingUp, TrendingDown, ShoppingCart, Truck } from "lucide-react"
 import { ExportDropdown } from "./export-dropdown"
+import { useState, useEffect } from "react"
+import { createClient } from "@/lib/supabase/client"
 
 interface PurchasesReportProps {
   dateRange: string
@@ -12,71 +14,136 @@ interface PurchasesReportProps {
 }
 
 export function PurchasesReport({ dateRange, startDate, endDate }: PurchasesReportProps) {
+  const [totalSpent, setTotalSpent] = useState(0)
+  const [totalOrders, setTotalOrders] = useState(0)
+  const [averageOrder, setAverageOrder] = useState(0)
+  const [topSuppliers, setTopSuppliers] = useState<any[]>([])
+  const [categories, setCategories] = useState<any[]>([])
+  const [recentPurchases, setRecentPurchases] = useState<any[]>([])
+  const [monthlyTrend, setMonthlyTrend] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const supabase = createClient()
+
+  useEffect(() => {
+    fetchPurchasesData()
+  }, [dateRange, startDate, endDate])
+
+  const fetchPurchasesData = async () => {
+    try {
+      setLoading(true)
+      console.log("Fetching purchases data...")
+      
+      // 1. Obtener compras con datos de proveedores
+      const { data: purchases, error: purchasesError } = await supabase
+        .from('purchases')
+        .select(`
+          id, 
+          total_amount, 
+          supplier_id, 
+          purchase_date, 
+          status,
+          suppliers(name)
+        `)
+        .gte('purchase_date', startDate.toISOString())
+        .lte('purchase_date', endDate.toISOString())
+      
+      if (purchasesError) {
+        console.error("Error fetching purchases:", purchasesError)
+        throw purchasesError
+      }
+      
+      console.log("Purchases data:", purchases)
+
+      // 2. Obtener items de compras
+      const { data: purchaseItems, error: itemsError } = await supabase
+        .from('purchase_items')
+        .select(`
+          total_price, 
+          inventory_item_id,
+          inventory_items(name, unit)
+        `)
+        .gte('created_at', startDate.toISOString())
+        .lte('created_at', endDate.toISOString())
+      
+      if (itemsError) {
+        console.warn("Error fetching purchase items:", itemsError)
+      }
+      
+      console.log("Purchase items data:", purchaseItems)
+
+      // 3. Calcular estadísticas básicas
+      const totalSpentVal = purchases?.reduce((acc: number, p: any) => acc + (p.total_amount || 0), 0) || 0
+      setTotalSpent(totalSpentVal)
+      setTotalOrders(purchases?.length || 0)
+      setAverageOrder(purchases && purchases.length > 0 ? Math.round(totalSpentVal / purchases.length) : 0)
+
+      // 4. Proveedores principales
+      const supplierMap: Record<string, { name: string, spent: number, orders: number, growth: number }> = {}
+      purchases?.forEach((p: any) => {
+        const name = p.suppliers?.name || `Proveedor ${p.supplier_id || 'Sin ID'}`
+        if (!supplierMap[name]) supplierMap[name] = { name, spent: 0, orders: 0, growth: 0 }
+        supplierMap[name].spent += p.total_amount || 0
+        supplierMap[name].orders += 1
+      })
+      const sortedSuppliers = Object.values(supplierMap).sort((a: any, b: any) => b.spent - a.spent).slice(0, 5)
+      setTopSuppliers(sortedSuppliers)
+
+      // 5. Gastos por categoría de insumo
+      const categoryMap: Record<string, { name: string, spent: number, orders: number }> = {}
+      purchaseItems?.forEach((item: any) => {
+        const itemName = item.inventory_items?.name || 'Item sin nombre'
+        const catName = itemName.split(' ')[0] + 's' // Simplificado: usar primera palabra + 's'
+        if (!categoryMap[catName]) categoryMap[catName] = { name: catName, spent: 0, orders: 0 }
+        categoryMap[catName].spent += item.total_price || 0
+        categoryMap[catName].orders += 1
+      })
+      const totalCatSpent = Object.values(categoryMap).reduce((acc: number, c: any) => acc + c.spent, 0)
+      const categoriesArr = Object.values(categoryMap).map((c: any) => ({ ...c, percentage: totalCatSpent > 0 ? Math.round((c.spent / totalCatSpent) * 100) : 0 }))
+      setCategories(categoriesArr)
+
+      // 6. Compras recientes
+      const recent = purchases?.slice(0, 4).map((p: any, i: number) => ({
+        id: p.id,
+        supplier: p.suppliers?.name || `Proveedor ${p.supplier_id || 'Sin ID'}`,
+        date: p.purchase_date,
+        amount: p.total_amount,
+        status: p.status,
+        items: purchaseItems?.filter((item: any) => item.purchase_id === p.id).length || 0
+      })) || []
+      setRecentPurchases(recent)
+
+      // 7. Tendencia mensual
+      const trendMap: Record<string, number> = {}
+      purchases?.forEach((p: any) => {
+        const d = new Date(p.purchase_date)
+        const key = d.toLocaleString('es-CO', { month: 'short' })
+        if (!trendMap[key]) trendMap[key] = 0
+        trendMap[key] += p.total_amount || 0
+      })
+      const trendArr = Object.entries(trendMap).map(([month, amount]: [string, number]) => ({ month, amount }))
+      setMonthlyTrend(trendArr)
+      
+    } catch (error) {
+      console.error('Error fetching purchases data:', error)
+      // Establecer valores por defecto en caso de error
+      setTotalSpent(0)
+      setTotalOrders(0)
+      setAverageOrder(0)
+      setTopSuppliers([])
+      setCategories([])
+      setRecentPurchases([])
+      setMonthlyTrend([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("es-CO", {
       style: "currency",
       currency: "COP",
       minimumFractionDigits: 0,
     }).format(amount)
-  }
-
-  // Datos de ejemplo para compras
-  const purchasesData = {
-    totalSpent: 12450000,
-    totalOrders: 45,
-    averageOrder: 276667,
-    topSuppliers: [
-      { name: "Distribuidora Central S.A.S.", spent: 4580000, orders: 12, growth: 15.2 },
-      { name: "Carnes Premium Ltda.", spent: 3240000, orders: 8, growth: 8.7 },
-      { name: "Frutas y Verduras del Campo", spent: 2180000, orders: 15, growth: 12.3 },
-      { name: "Lácteos La Pradera", spent: 1450000, orders: 6, growth: -2.1 },
-      { name: "Bebidas y Licores El Dorado", spent: 1000000, orders: 4, growth: 5.8 },
-    ],
-    categories: [
-      { name: "Carnes y Proteínas", spent: 4580000, percentage: 36.8, orders: 15 },
-      { name: "Frutas y Verduras", spent: 2890000, percentage: 23.2, orders: 18 },
-      { name: "Lácteos", spent: 2180000, percentage: 17.5, orders: 8 },
-      { name: "Bebidas", spent: 1450000, percentage: 11.6, orders: 6 },
-      { name: "Granos y Cereales", spent: 1350000, percentage: 10.9, orders: 12 },
-    ],
-    recentPurchases: [
-      {
-        id: "PUR-001",
-        supplier: "Distribuidora Central S.A.S.",
-        date: "2024-01-15",
-        amount: 450000,
-        status: "completed",
-        items: 8,
-      },
-      {
-        id: "PUR-002",
-        supplier: "Carnes Premium Ltda.",
-        date: "2024-01-14",
-        amount: 680000,
-        status: "completed",
-        items: 5,
-      },
-      {
-        id: "PUR-003",
-        supplier: "Frutas y Verduras del Campo",
-        date: "2024-01-13",
-        amount: 320000,
-        status: "pending",
-        items: 12,
-      },
-      {
-        id: "PUR-004",
-        supplier: "Lácteos La Pradera",
-        date: "2024-01-12",
-        amount: 280000,
-        status: "completed",
-        items: 6,
-      },
-    ],
-    monthlyTrend: [
-      { month: "Dic", amount: 11800000 },
-      { month: "Ene", amount: 12450000 },
-    ],
   }
 
   const getStatusColor = (status: string) => {
@@ -113,14 +180,14 @@ export function PurchasesReport({ dateRange, startDate, endDate }: PurchasesRepo
           reportTitle="Reporte de Compras"
           data={{
             resumen: {
-              totalGastado: purchasesData.totalSpent,
-              totalOrdenes: purchasesData.totalOrders,
-              promedioOrden: purchasesData.averageOrder,
+              totalGastado: totalSpent,
+              totalOrdenes: totalOrders,
+              promedioOrden: averageOrder,
               periodoAnalizado: dateRange,
             },
-            proveedores: purchasesData.topSuppliers,
-            categorias: purchasesData.categories,
-            comprasRecientes: purchasesData.recentPurchases,
+            proveedores: topSuppliers,
+            categorias: categories,
+            comprasRecientes: recentPurchases,
           }}
           filename="reporte_compras"
           elementId="purchases-report-content"
@@ -135,7 +202,7 @@ export function PurchasesReport({ dateRange, startDate, endDate }: PurchasesRepo
             <CardTitle className="text-sm font-medium text-muted-foreground">Total Gastado</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-blue-600">{formatCurrency(purchasesData.totalSpent)}</div>
+            <div className="text-2xl font-bold text-blue-600">{formatCurrency(totalSpent)}</div>
             <div className="flex items-center mt-2 text-sm">
               <TrendingUp className="h-4 w-4 text-green-500 mr-1" />
               <span className="text-green-600">+5.5%</span>
@@ -149,7 +216,7 @@ export function PurchasesReport({ dateRange, startDate, endDate }: PurchasesRepo
             <CardTitle className="text-sm font-medium text-muted-foreground">Órdenes Totales</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{purchasesData.totalOrders}</div>
+            <div className="text-2xl font-bold text-green-600">{totalOrders}</div>
             <div className="flex items-center mt-2 text-sm">
               <ShoppingCart className="h-4 w-4 text-green-500 mr-1" />
               <span className="text-muted-foreground">Compras realizadas</span>
@@ -162,7 +229,7 @@ export function PurchasesReport({ dateRange, startDate, endDate }: PurchasesRepo
             <CardTitle className="text-sm font-medium text-muted-foreground">Promedio por Orden</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-purple-600">{formatCurrency(purchasesData.averageOrder)}</div>
+            <div className="text-2xl font-bold text-purple-600">{formatCurrency(averageOrder)}</div>
             <div className="flex items-center mt-2 text-sm">
               <Truck className="h-4 w-4 text-purple-500 mr-1" />
               <span className="text-muted-foreground">Por compra</span>
@@ -178,7 +245,7 @@ export function PurchasesReport({ dateRange, startDate, endDate }: PurchasesRepo
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {purchasesData.topSuppliers.map((supplier, index) => (
+            {topSuppliers.map((supplier: any, index: number) => (
               <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                 <div className="flex items-center space-x-3">
                   <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold">
@@ -216,7 +283,7 @@ export function PurchasesReport({ dateRange, startDate, endDate }: PurchasesRepo
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {purchasesData.categories.map((category, index) => (
+            {categories.map((category: any, index: number) => (
               <div key={index} className="space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="font-medium">{category.name}</span>
@@ -242,7 +309,7 @@ export function PurchasesReport({ dateRange, startDate, endDate }: PurchasesRepo
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {purchasesData.recentPurchases.map((purchase, index) => (
+            {recentPurchases.map((purchase: any, index: number) => (
               <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                 <div className="flex items-center space-x-3">
                   <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
