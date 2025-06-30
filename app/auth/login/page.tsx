@@ -16,6 +16,7 @@ import { Alert, AlertTitle, AlertDescription } from "@/Componentes/ui/alert"
 import { Session } from '@supabase/supabase-js'
 
 function LoginPageContent() {
+  console.log("Renderizando LoginPageContent")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
@@ -58,8 +59,6 @@ function LoginPageContent() {
           description: "Esta es una demostración. En producción se conectaría a Supabase.",
           variant: "default",
         })
-
-        // Simulate successful login in preview
         setTimeout(() => {
           window.location.href = "/dashboard"
         }, 1000)
@@ -71,6 +70,11 @@ function LoginPageContent() {
         password,
       })
 
+      console.log("Resultado de signInWithPassword:", { data, error })
+      if (typeof window !== 'undefined') {
+        console.log("Cookies tras login:", document.cookie)
+      }
+
       if (error) {
         throw "Credenciales inválidas. Verifica tu email y contraseña."
       }
@@ -80,9 +84,18 @@ function LoginPageContent() {
           title: "Inicio de sesión exitoso",
           description: "Redirigiendo al dashboard...",
         })
-
+        console.log("Sesión creada:", data.session)
         window.location.href = "/dashboard"
+        return
       }
+
+      // Si no hay error ni sesión, forzar mensaje de error
+      toast({
+        title: "Error de inicio de sesión",
+        description: "No se pudo iniciar sesión. Intenta de nuevo o contacta al administrador.",
+        variant: "destructive",
+      })
+      console.error("No se pudo iniciar sesión: sin error ni sesión.", { data, error })
     } catch (error: any) {
       console.error("Login error:", error)
 

@@ -1,5 +1,10 @@
-import { redirect } from "next/navigation"
+import ProtectedRoute from "@/Componentes/ProtectedRoute"
+import UsuariosPage from "../Usuarios/page"
 
 export default function UsersPage() {
-  redirect("/dashboard/Usuarios")
+  return (
+    <ProtectedRoute allowedRoles={["admin"]}>
+      <UsuariosPage />
+    </ProtectedRoute>
+  )
 } 

@@ -4,6 +4,7 @@ import { ThemeProvider } from "@/Componentes/theme-provider"
 import { SidebarProvider } from "@/Componentes/ui/sidebar"
 import { Toaster } from "@/Componentes/ui/toaster"
 import { AutoLogoutHandler } from "@/Componentes/auto-logout-handler"
+import { UserRoleProvider } from "@/hooks/UserRoleContext"
 import "./globals.css"
 
 const inter = Inter({ subsets: ["latin"] })
@@ -24,9 +25,11 @@ export default function RootLayout({
       <body className={inter.className}>
         <ThemeProvider attribute="class" defaultTheme="light">
           <SidebarProvider>
-            <AutoLogoutHandler />
-            {children}
-            <Toaster />
+            <UserRoleProvider>
+              <AutoLogoutHandler />
+              {children}
+              <Toaster />
+            </UserRoleProvider>
           </SidebarProvider>
         </ThemeProvider>
       </body>

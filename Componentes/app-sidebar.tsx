@@ -20,7 +20,7 @@ import {
 import { Button } from "@/Componentes/ui/button"
 import { createClient } from "@/lib/supabase/client"
 import { useToast } from "@/Componentes/ui/use-toast"
-import { useUserRole } from "@/hooks/useUserRole"
+import { useUserRoleContext } from "@/hooks/UserRoleContext"
 import { Skeleton } from "@/Componentes/ui/skeleton"
 import { Sheet, SheetContent, SheetTitle } from "@/Componentes/ui/sheet"
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden"
@@ -82,7 +82,7 @@ function SidebarContent({ onLinkClick }: { onLinkClick?: () => void } = {}) {
   const router = useRouter()
   const supabase = createClient()
   const { toast } = useToast()
-  const { role, loading } = useUserRole()
+  const { role, loading } = useUserRoleContext()
   const [error, setError] = useState<string | null>(null)
 
   const isActive = (path: string) => {

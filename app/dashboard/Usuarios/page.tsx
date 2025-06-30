@@ -23,6 +23,7 @@ import { createClient } from "@/lib/supabase/client"
 import { useToast } from "@/Componentes/ui/use-toast"
 import { User as SupabaseUser, Session, AuthChangeEvent } from '@supabase/supabase-js'
 import { User, Profile } from "@/app/types"
+import ProtectedRoute from "@/Componentes/ProtectedRoute"
 
 interface AuthUser extends SupabaseUser {
   user_metadata: {
@@ -311,168 +312,170 @@ export default function UsersPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Lista de Usuarios ({users.length})</h1>
-        </div>
-        <Button onClick={() => setIsCreateDialogOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Nuevo Usuario
-        </Button>
-      </div>
-
-      {/* Stats Cards */}
-      <UserStatsCards users={users} />
-
-      {/* Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Filtros</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1 relative">
-              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar usuarios..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-8"
-              />
-            </div>
-            <select
-              className="p-2 border rounded-md"
-              value={selectedRole}
-              onChange={(e) => setSelectedRole(e.target.value)}
-            >
-              <option value="all">Todos los roles</option>
-              <option value="admin">Administradores</option>
-              <option value="waiter">Meseros</option>
-              <option value="cashier">Cajeros</option>
-              <option value="chef">Chefs</option>
-            </select>
+    <ProtectedRoute allowedRoles={["admin"]}>
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Lista de Usuarios ({users.length})</h1>
           </div>
-        </CardContent>
-      </Card>
+          <Button onClick={() => setIsCreateDialogOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Nuevo Usuario
+          </Button>
+        </div>
 
-      {/* Users Table */}
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Usuario</TableHead>
-                <TableHead>Rol</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead>Último Acceso</TableHead>
-                <TableHead>Rendimiento</TableHead>
-                <TableHead>Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
+        {/* Stats Cards */}
+        <UserStatsCards users={users} />
+
+        {/* Filters */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Filtros</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="flex-1 relative">
+                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar usuarios..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-8"
+                />
+              </div>
+              <select
+                className="p-2 border rounded-md"
+                value={selectedRole}
+                onChange={(e) => setSelectedRole(e.target.value)}
+              >
+                <option value="all">Todos los roles</option>
+                <option value="admin">Administradores</option>
+                <option value="waiter">Meseros</option>
+                <option value="cashier">Cajeros</option>
+                <option value="chef">Chefs</option>
+              </select>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Users Table */}
+        <Card>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-4">
-                    Cargando usuarios...
-                  </TableCell>
+                  <TableHead>Usuario</TableHead>
+                  <TableHead>Rol</TableHead>
+                  <TableHead>Estado</TableHead>
+                  <TableHead>Último Acceso</TableHead>
+                  <TableHead>Rendimiento</TableHead>
+                  <TableHead>Acciones</TableHead>
                 </TableRow>
-              ) : users.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center py-4">
-                    No se encontraron usuarios
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredUsers.map((user) => (
-                  <TableRow key={user.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-sm font-medium">
-                          {getInitials(user.first_name, user.last_name)}
-                        </div>
-                        <div>
-                          <p className="font-medium">
-                            {`${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Sin nombre'}
-                          </p>
-                          <p className="text-sm text-muted-foreground">{user.email || 'Sin email'}</p>
-                          {user.phone && (
-                            <p className="text-sm text-muted-foreground">{user.phone}</p>
-                          )}
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={getRoleColor(user.role)}>{getRoleText(user.role)}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={getStatusColor(user.status)}>{getStatusText(user.status)}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      {user.last_sign_in_at ? formatDateTime(user.last_sign_in_at) : "Nunca"}
-                    </TableCell>
-                    <TableCell>
-                      {user.total_orders ? (
-                        <div>
-                          <p>{user.total_orders} órdenes</p>
-                          <p className="text-sm text-green-600">{formatCurrency(user.total_sales || 0)}</p>
-                        </div>
-                      ) : (
-                        "N/A"
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => setEditingUser(user)}>
-                            <Edit className="mr-2 h-4 w-4" />
-                            Editar
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={async () => {
-                              await handleUserStatusToggle(user)
-                            }}
-                          >
-                            {user.status === 'active' ? (
-                              <>
-                                <UserX className="mr-2 h-4 w-4" />
-                                Desactivar
-                              </>
-                            ) : (
-                              <>
-                                <UserCheck className="mr-2 h-4 w-4" />
-                                Activar
-                              </>
-                            )}
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-4">
+                      Cargando usuarios...
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+                ) : users.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-4">
+                      No se encontraron usuarios
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredUsers.map((user) => (
+                    <TableRow key={user.id}>
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-sm font-medium">
+                            {getInitials(user.first_name, user.last_name)}
+                          </div>
+                          <div>
+                            <p className="font-medium">
+                              {`${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Sin nombre'}
+                            </p>
+                            <p className="text-sm text-muted-foreground">{user.email || 'Sin email'}</p>
+                            {user.phone && (
+                              <p className="text-sm text-muted-foreground">{user.phone}</p>
+                            )}
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={getRoleColor(user.role)}>{getRoleText(user.role)}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={getStatusColor(user.status)}>{getStatusText(user.status)}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        {user.last_sign_in_at ? formatDateTime(user.last_sign_in_at) : "Nunca"}
+                      </TableCell>
+                      <TableCell>
+                        {user.total_orders ? (
+                          <div>
+                            <p>{user.total_orders} órdenes</p>
+                            <p className="text-sm text-green-600">{formatCurrency(user.total_sales || 0)}</p>
+                          </div>
+                        ) : (
+                          "N/A"
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => setEditingUser(user)}>
+                              <Edit className="mr-2 h-4 w-4" />
+                              Editar
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={async () => {
+                                await handleUserStatusToggle(user)
+                              }}
+                            >
+                              {user.status === 'active' ? (
+                                <>
+                                  <UserX className="mr-2 h-4 w-4" />
+                                  Desactivar
+                                </>
+                              ) : (
+                                <>
+                                  <UserCheck className="mr-2 h-4 w-4" />
+                                  Activar
+                                </>
+                              )}
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
 
-      <CreateUserDialog
-        open={isCreateDialogOpen}
-        onOpenChange={setIsCreateDialogOpen}
-        onUserCreated={fetchUsers}
-      />
+        <CreateUserDialog
+          open={isCreateDialogOpen}
+          onOpenChange={setIsCreateDialogOpen}
+          onUserCreated={fetchUsers}
+        />
 
-      <EditUserDialog
-        user={editingUser}
-        open={!!editingUser}
-        onOpenChange={(open) => !open && setEditingUser(null)}
-        onUserEdited={fetchUsers}
-      />
-    </div>
+        <EditUserDialog
+          user={editingUser}
+          open={!!editingUser}
+          onOpenChange={(open) => !open && setEditingUser(null)}
+          onUserEdited={fetchUsers}
+        />
+      </div>
+    </ProtectedRoute>
   )
 }

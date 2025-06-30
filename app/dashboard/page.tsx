@@ -8,6 +8,7 @@ import { RecentOrders } from "@/Componentes/Panel/recent-orders"
 import { TableStatus } from "@/Componentes/Panel/table-status"
 import { TopSellingItems } from "@/Componentes/Panel/top-selling-items"
 import { Skeleton } from "@/Componentes/ui/skeleton"
+import ProtectedRoute from "@/Componentes/ProtectedRoute"
 
 export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
@@ -38,25 +39,27 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Panel</h1>
-        <p className="text-gray-600">Resumen general del restaurante</p>
-      </div>
+    <ProtectedRoute>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Panel</h1>
+          <p className="text-gray-600">Resumen general del restaurante</p>
+        </div>
 
-      {/* Stats Cards */}
-      <DashboardStats />
+        {/* Stats Cards */}
+        <DashboardStats />
 
-      {/* Main Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <TableStatus />
-        <RecentOrders />
-      </div>
+        {/* Main Content Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <TableStatus />
+          <RecentOrders />
+        </div>
 
-      {/* Bottom Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
-        <TopSellingItems />
+        {/* Bottom Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
+          <TopSellingItems />
+        </div>
       </div>
-    </div>
+    </ProtectedRoute>
   )
 }

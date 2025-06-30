@@ -38,5 +38,12 @@ export function createClient() {
     } as any
   }
 
-  return createBrowserClient(supabaseUrl, supabaseAnonKey)
+  // Forzar persistencia de sesión en cookies y auto-refresh
+  return createBrowserClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      storageKey: "supabase.auth.token"
+    },
+  })
 }
