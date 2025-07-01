@@ -5,11 +5,13 @@ import { Download, FileArchive } from "lucide-react"
 import { Button } from "@/Componentes/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/Componentes/ui/card"
 import { Checkbox } from "@/Componentes/ui/checkbox"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/Componentes/ui/select"
 import { createClient } from "@/lib/supabase/client"
 import { useToast } from "@/Componentes/ui/use-toast"
 
 export function BulkExport() {
   const [selectedReports, setSelectedReports] = useState<string[]>([])
+  const [selectedPeriod, setSelectedPeriod] = useState<string>("30") // 30 días por defecto
   const [isExporting, setIsExporting] = useState(false)
   const { toast } = useToast()
   const supabase = createClient()
@@ -19,6 +21,15 @@ export function BulkExport() {
     { id: "products", name: "Reporte de Productos", description: "Análisis de productos y categorías", icon: "📦" },
     { id: "inventory", name: "Reporte de Inventario", description: "Estado y valorización del inventario", icon: "📊" },
     { id: "purchases", name: "Reporte de Compras", description: "Análisis de compras y proveedores", icon: "🛒" },
+  ]
+
+  const periodOptions = [
+    { value: "1", label: "📅 Último día" },
+    { value: "7", label: "📅 Última semana" },
+    { value: "30", label: "📅 Último mes" },
+    { value: "90", label: "📅 Últimos 3 meses" },
+    { value: "180", label: "📅 Últimos 6 meses" },
+    { value: "365", label: "📅 Último año" },
   ]
 
   const handleReportToggle = (reportId: string) => {
@@ -51,11 +62,29 @@ export function BulkExport() {
     }
   }
 
-  // Función para obtener datos de ventas
-  const fetchSalesData = async () => {
+  const getDateRange = () => {
     const endDate = new Date()
     const startDate = new Date()
-    startDate.setDate(startDate.getDate() - 30) // Últimos 30 días
+    const days = parseInt(selectedPeriod)
+    startDate.setDate(startDate.getDate() - days)
+    return { startDate, endDate }
+  }
+
+  const getPeriodLabel = (period: string) => {
+    const periodMap: Record<string, string> = {
+      "1": "Último día",
+      "7": "Última semana",
+      "30": "Último mes",
+      "90": "Últimos 3 meses",
+      "180": "Últimos 6 meses",
+      "365": "Último año"
+    }
+    return periodMap[period] || `Últimos ${period} días`
+  }
+
+  // Función para obtener datos de ventas
+  const fetchSalesData = async () => {
+    const { startDate, endDate } = getDateRange()
 
     const { data: orders, error: ordersError } = await supabase
       .from('orders')
@@ -103,9 +132,7 @@ export function BulkExport() {
 
   // Función para obtener datos de productos
   const fetchProductsData = async () => {
-    const endDate = new Date()
-    const startDate = new Date()
-    startDate.setDate(startDate.getDate() - 30)
+    const { startDate, endDate } = getDateRange()
 
     const { data: orders, error: ordersError } = await supabase
       .from('orders')
@@ -233,9 +260,7 @@ export function BulkExport() {
 
   // Función para obtener datos de compras
   const fetchPurchasesData = async () => {
-    const endDate = new Date()
-    const startDate = new Date()
-    startDate.setDate(startDate.getDate() - 30)
+    const { startDate, endDate } = getDateRange()
 
     const { data: purchases, error: purchasesError } = await supabase
       .from('purchases')
@@ -462,7 +487,7 @@ export function BulkExport() {
           <div class="header">
             <div class="company-logo">🍽️ RESTAURANTE OS</div>
             <div class="report-title">Reporte Combinado de Gestión</div>
-            <div style="color: #1e40af; font-weight: 600;">Período: Últimos 30 días</div>
+            <div style="color: #1e40af; font-weight: 600;">Período: ${getPeriodLabel(selectedPeriod)}</div>
           </div>
 
           <div class="report-info">
@@ -757,7 +782,7 @@ export function BulkExport() {
 
       toast({
         title: "✅ PDF Combinado Generado Exitosamente",
-        description: `Documento profesional con ${selectedReports.length} reportes. Ábrelo en tu navegador y usa Ctrl+P para imprimir como PDF.`,
+        description: `Documento profesional con ${selectedReports.length} reportes para ${getPeriodLabel(selectedPeriod)}. Ábrelo en tu navegador y usa Ctrl+P para imprimir como PDF.`,
         duration: 8000,
       })
     } catch (error) {
@@ -781,6 +806,23 @@ export function BulkExport() {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
+        {/* Selección de período */}
+        <div>
+          <h4 className="font-medium mb-3">📅 Período del Reporte</h4>
+          <Select value={selectedPeriod} onValueChange={(value) => setSelectedPeriod(value)}>
+            <SelectTrigger className="w-full max-w-xs">
+              <SelectValue placeholder="Seleccionar período" />
+            </SelectTrigger>
+            <SelectContent>
+              {periodOptions.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
         {/* Selección de reportes */}
         <div>
           <h4 className="font-medium mb-3">Seleccionar Reportes para PDF Combinado</h4>
