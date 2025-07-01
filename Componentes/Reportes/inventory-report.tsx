@@ -261,11 +261,21 @@ export function InventoryReport({ dateRange, startDate, endDate }: InventoryRepo
               unit: item.unit,
               urgency: getUrgencyLevel(item)
             })),
+            sinStock: outOfStockItems.map(item => ({
+              name: item.name,
+              quantity: item.quantity,
+              min_quantity: item.min_quantity,
+              unit: item.unit,
+              updated_at: item.updated_at
+            })),
             movimientos: recentMovements.map(movement => ({
-              item: movement.inventory_items.name,
-              type: movement.movement_type,
+              created_at: movement.created_at,
+              inventory_items: {
+                name: movement.inventory_items.name,
+                unit: movement.inventory_items.unit
+              },
+              movement_type: movement.movement_type,
               quantity: movement.quantity,
-              date: movement.created_at,
               reason: movement.reason
             })),
           }}

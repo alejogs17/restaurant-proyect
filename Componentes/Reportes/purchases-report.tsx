@@ -188,6 +188,7 @@ export function PurchasesReport({ dateRange, startDate, endDate }: PurchasesRepo
             proveedores: topSuppliers,
             categorias: categories,
             comprasRecientes: recentPurchases,
+            tendenciaMensual: monthlyTrend,
           }}
           filename="reporte_compras"
           elementId="purchases-report-content"
