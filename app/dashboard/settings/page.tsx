@@ -1,3 +1,5 @@
+"use client";
+
 import ProtectedRoute from "@/Componentes/ProtectedRoute"
 import { useState } from "react"
 import { Save, Shield } from "lucide-react"
