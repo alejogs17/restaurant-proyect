@@ -9,7 +9,6 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
-  DropdownMenuTrigger,
 } from "@/Componentes/ui/dropdown-menu"
 import { useToast } from "@/Componentes/ui/use-toast"
 
@@ -1240,12 +1239,6 @@ export function ExportDropdown({ data, filename, elementId, startDate, endDate, 
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="outline" disabled={isExporting} className="min-w-[140px]">
-          <Download className="h-4 w-4 mr-2" />
-          {isExporting ? "Exportando..." : "📄 Exportar"}
-        </Button>
-      </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-64">
         <DropdownMenuLabel>📊 Formato de Exportación</DropdownMenuLabel>
         <DropdownMenuSeparator />
@@ -1254,13 +1247,6 @@ export function ExportDropdown({ data, filename, elementId, startDate, endDate, 
           <div className="flex flex-col">
             <span className="font-medium">📄 Documento PDF</span>
             <span className="text-xs text-muted-foreground">Se abre en navegador para imprimir</span>
-          </div>
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={exportToExcel} className="cursor-pointer">
-          <FileSpreadsheet className="h-4 w-4 mr-2" />
-          <div className="flex flex-col">
-            <span className="font-medium">📊 Hoja Excel</span>
-            <span className="text-xs text-muted-foreground">CSV con separador punto y coma</span>
           </div>
         </DropdownMenuItem>
       </DropdownMenuContent>
