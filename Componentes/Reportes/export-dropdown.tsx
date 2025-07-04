@@ -9,7 +9,6 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
-  DropdownMenuTrigger,
 } from "@/Componentes/ui/dropdown-menu"
 import { useToast } from "@/Componentes/ui/use-toast"
 
@@ -177,6 +176,18 @@ export function ExportDropdown({ data, filename, elementId, startDate, endDate, 
         csvContent += `\n`
       }
 
+      // PRODUCTOS DE BAJO RENDIMIENTO
+      if (data.bajoRendimiento) {
+        csvContent += `PRODUCTOS DE BAJO RENDIMIENTO\n`
+        csvContent += `=============================\n`
+        csvContent += `Posición;Producto;Unidades Vendidas;Ingresos;Crecimiento\n`
+        data.bajoRendimiento.forEach((product: any, index: number) => {
+          const revenue = formatCurrency(product.revenue).replace(/,/g, ".")
+          csvContent += `${index + 1};${product.name};${product.sold};${revenue};${product.growth}%\n`
+        })
+        csvContent += `\n`
+      }
+
       // CATEGORÍAS
       if (data.categorias) {
         csvContent += `VENTAS POR CATEGORÍA\n`
@@ -197,6 +208,31 @@ export function ExportDropdown({ data, filename, elementId, startDate, endDate, 
         data.proveedores.forEach((supplier: any, index: number) => {
           const spent = formatCurrency(supplier.spent).replace(/,/g, ".")
           csvContent += `${index + 1};${supplier.name};${spent};${supplier.orders};${supplier.growth}%\n`
+        })
+        csvContent += `\n`
+      }
+
+      // COMPRAS RECIENTES
+      if (data.comprasRecientes) {
+        csvContent += `COMPRAS RECIENTES\n`
+        csvContent += `==================\n`
+        csvContent += `ID;Proveedor;Fecha;Monto;Estado;Items\n`
+        data.comprasRecientes.forEach((purchase: any) => {
+          const amount = formatCurrency(purchase.amount).replace(/,/g, ".")
+          const date = new Date(purchase.date).toLocaleDateString("es-CO")
+          csvContent += `${purchase.id};${purchase.supplier};${date};${amount};${purchase.status};${purchase.items}\n`
+        })
+        csvContent += `\n`
+      }
+
+      // TENDENCIA MENSUAL
+      if (data.tendenciaMensual) {
+        csvContent += `TENDENCIA MENSUAL DE COMPRAS\n`
+        csvContent += `============================\n`
+        csvContent += `Mes;Monto Total\n`
+        data.tendenciaMensual.forEach((trend: any) => {
+          const amount = formatCurrency(trend.amount).replace(/,/g, ".")
+          csvContent += `${trend.month};${amount}\n`
         })
         csvContent += `\n`
       }
@@ -222,6 +258,31 @@ export function ExportDropdown({ data, filename, elementId, startDate, endDate, 
         data.alertas.forEach((alert: any) => {
           const urgency = alert.urgency === "high" ? "Alta" : "Media"
           csvContent += `${alert.name};${alert.current};${alert.minimum};${alert.unit};${urgency}\n`
+        })
+        csvContent += `\n`
+      }
+
+      // ITEMS SIN STOCK
+      if (data.sinStock) {
+        csvContent += `ITEMS SIN STOCK\n`
+        csvContent += `===============\n`
+        csvContent += `Producto;Stock Actual;Stock Mínimo;Unidad;Última Actualización\n`
+        data.sinStock.forEach((item: any) => {
+          const date = new Date(item.updated_at).toLocaleDateString("es-CO")
+          csvContent += `${item.name};${item.quantity};${item.min_quantity};${item.unit};${date}\n`
+        })
+        csvContent += `\n`
+      }
+
+      // MOVIMIENTOS DE INVENTARIO
+      if (data.movimientos) {
+        csvContent += `MOVIMIENTOS DE INVENTARIO\n`
+        csvContent += `=========================\n`
+        csvContent += `Fecha;Producto;Tipo;Cantidad;Unidad;Razón\n`
+        data.movimientos.forEach((movement: any) => {
+          const date = new Date(movement.created_at).toLocaleDateString("es-CO")
+          const type = movement.movement_type === "in" ? "Entrada" : "Salida"
+          csvContent += `${date};${movement.inventory_items?.name || "N/A"};${type};${movement.quantity};${movement.inventory_items?.unit || "N/A"};${movement.reason}\n`
         })
         csvContent += `\n`
       }
@@ -450,6 +511,373 @@ export function ExportDropdown({ data, filename, elementId, startDate, endDate, 
                 <td class="text-center ${growthClass}">
                   ${growthIcon} ${product.growth > 0 ? "+" : ""}${product.growth}%
                 </td>
+              </tr>
+            `
+          })
+
+          content += `
+                </tbody>
+              </table>
+            </div>
+          `
+        }
+
+        // PRODUCTOS DE BAJO RENDIMIENTO
+        if (data.bajoRendimiento) {
+          content += `
+            <div class="section">
+              <div class="section-title">⚠️ PRODUCTOS DE BAJO RENDIMIENTO</div>
+              <table>
+                <thead>
+                  <tr>
+                    <th>🏷️ Producto</th>
+                    <th>📦 Unidades Vendidas</th>
+                    <th>💰 Ingresos Generados</th>
+                    <th>📉 Crecimiento</th>
+                  </tr>
+                </thead>
+                <tbody>
+          `
+
+          data.bajoRendimiento.forEach((product: any) => {
+            const growthClass = "text-red"
+            const growthIcon = "📉"
+
+            content += `
+              <tr>
+                <td><strong>${product.name}</strong></td>
+                <td class="text-center">${product.sold}</td>
+                <td class="currency">${formatCurrency(product.revenue)}</td>
+                <td class="text-center ${growthClass}">
+                  ${growthIcon} ${product.growth}%
+                </td>
+              </tr>
+            `
+          })
+
+          content += `
+                </tbody>
+              </table>
+            </div>
+          `
+        }
+
+        // CATEGORÍAS
+        if (data.categorias) {
+          content += `
+            <div class="section">
+              <div class="section-title">📊 VENTAS POR CATEGORÍA</div>
+              <table>
+                <thead>
+                  <tr>
+                    <th>🏷️ Categoría</th>
+                    <th>💰 Monto Total</th>
+                    <th>📊 Porcentaje</th>
+                    <th>📈 Participación</th>
+                  </tr>
+                </thead>
+                <tbody>
+          `
+
+          data.categorias.forEach((category: any) => {
+            const amount = formatCurrency(category.revenue || category.spent)
+            content += `
+              <tr>
+                <td><strong>${category.name}</strong></td>
+                <td class="currency">${amount}</td>
+                <td class="percentage">${category.percentage}%</td>
+                <td>
+                  <div style="background-color: #e2e8f0; border-radius: 10px; height: 20px; position: relative;">
+                    <div style="background-color: #3b82f6; height: 100%; width: ${category.percentage}%; border-radius: 10px;"></div>
+                  </div>
+                </td>
+              </tr>
+            `
+          })
+
+          content += `
+                </tbody>
+              </table>
+            </div>
+          `
+        }
+
+        // PROVEEDORES
+        if (data.proveedores) {
+          content += `
+            <div class="section">
+              <div class="section-title">🏢 PRINCIPALES PROVEEDORES</div>
+              <table>
+                <thead>
+                  <tr>
+                    <th>🥇 Posición</th>
+                    <th>🏢 Nombre del Proveedor</th>
+                    <th>💰 Monto Gastado</th>
+                    <th>📋 Número de Órdenes</th>
+                    <th>📈 Crecimiento</th>
+                  </tr>
+                </thead>
+                <tbody>
+          `
+
+          data.proveedores.forEach((supplier: any, index: number) => {
+            const position = index + 1
+            const medal = position === 1 ? "🥇" : position === 2 ? "🥈" : position === 3 ? "🥉" : `${position}°`
+
+            content += `
+              <tr>
+                <td class="text-center"><strong>${medal}</strong></td>
+                <td><strong>${supplier.name}</strong></td>
+                <td class="currency">${formatCurrency(supplier.spent)}</td>
+                <td class="text-center">${supplier.orders}</td>
+                <td class="text-center">${supplier.growth}%</td>
+              </tr>
+            `
+          })
+
+          content += `
+                </tbody>
+              </table>
+            </div>
+          `
+        }
+
+        // COMPRAS RECIENTES
+        if (data.comprasRecientes) {
+          content += `
+            <div class="section">
+              <div class="section-title">🛒 COMPRAS RECIENTES</div>
+              <table>
+                <thead>
+                  <tr>
+                    <th>🆔 ID</th>
+                    <th>🏢 Proveedor</th>
+                    <th>📅 Fecha</th>
+                    <th>💰 Monto</th>
+                    <th>📊 Estado</th>
+                    <th>📦 Items</th>
+                  </tr>
+                </thead>
+                <tbody>
+          `
+
+          data.comprasRecientes.forEach((purchase: any) => {
+            const date = new Date(purchase.date).toLocaleDateString("es-CO")
+            const statusClass = purchase.status === "completed" ? "text-green" : purchase.status === "pending" ? "text-yellow" : "text-red"
+
+            content += `
+              <tr>
+                <td class="text-center">${purchase.id}</td>
+                <td><strong>${purchase.supplier}</strong></td>
+                <td class="text-center">${date}</td>
+                <td class="currency">${formatCurrency(purchase.amount)}</td>
+                <td class="text-center ${statusClass}">${purchase.status}</td>
+                <td class="text-center">${purchase.items}</td>
+              </tr>
+            `
+          })
+
+          content += `
+                </tbody>
+              </table>
+            </div>
+          `
+        }
+
+        // TENDENCIA MENSUAL
+        if (data.tendenciaMensual) {
+          content += `
+            <div class="section">
+              <div class="section-title">📈 TENDENCIA MENSUAL DE COMPRAS</div>
+              <table>
+                <thead>
+                  <tr>
+                    <th>📅 Mes</th>
+                    <th>💰 Monto Total</th>
+                    <th>📊 Gráfico</th>
+                  </tr>
+                </thead>
+                <tbody>
+          `
+
+          const maxAmount = Math.max(...data.tendenciaMensual.map((t: any) => t.amount))
+          data.tendenciaMensual.forEach((trend: any) => {
+            const percentage = maxAmount > 0 ? (trend.amount / maxAmount) * 100 : 0
+            content += `
+              <tr>
+                <td><strong>${trend.month}</strong></td>
+                <td class="currency">${formatCurrency(trend.amount)}</td>
+                <td>
+                  <div style="background-color: #e2e8f0; border-radius: 10px; height: 20px; position: relative;">
+                    <div style="background-color: #10b981; height: 100%; width: ${percentage}%; border-radius: 10px;"></div>
+                  </div>
+                </td>
+              </tr>
+            `
+          })
+
+          content += `
+                </tbody>
+              </table>
+            </div>
+          `
+        }
+
+        // ITEMS DE INVENTARIO
+        if (data.itemsValor) {
+          content += `
+            <div class="section">
+              <div class="section-title">📦 ITEMS DE MAYOR VALOR EN INVENTARIO</div>
+              <table>
+                <thead>
+                  <tr>
+                    <th>🥇 Posición</th>
+                    <th>🏷️ Producto</th>
+                    <th>📦 Cantidad</th>
+                    <th>📏 Unidad</th>
+                    <th>💰 Valor Total</th>
+                    <th>⚠️ Estado</th>
+                  </tr>
+                </thead>
+                <tbody>
+          `
+
+          data.itemsValor.forEach((item: any, index: number) => {
+            const position = index + 1
+            const medal = position === 1 ? "🥇" : position === 2 ? "🥈" : position === 3 ? "🥉" : `${position}°`
+            const statusClass = item.status === "low" ? "text-red" : "text-green"
+            const statusIcon = item.status === "low" ? "⚠️" : "✅"
+
+            content += `
+              <tr>
+                <td class="text-center"><strong>${medal}</strong></td>
+                <td><strong>${item.name}</strong></td>
+                <td class="text-center">${item.quantity}</td>
+                <td class="text-center">${item.unit}</td>
+                <td class="currency">${formatCurrency(item.value)}</td>
+                <td class="text-center ${statusClass}">${statusIcon} ${item.status === "low" ? "Stock Bajo" : "Normal"}</td>
+              </tr>
+            `
+          })
+
+          content += `
+                </tbody>
+              </table>
+            </div>
+          `
+        }
+
+        // ALERTAS DE STOCK
+        if (data.alertas) {
+          content += `
+            <div class="section">
+              <div class="section-title">🚨 ALERTAS DE STOCK BAJO</div>
+              <table>
+                <thead>
+                  <tr>
+                    <th>🏷️ Producto</th>
+                    <th>📦 Stock Actual</th>
+                    <th>📊 Stock Mínimo</th>
+                    <th>📏 Unidad</th>
+                    <th>⚠️ Urgencia</th>
+                  </tr>
+                </thead>
+                <tbody>
+          `
+
+          data.alertas.forEach((alert: any) => {
+            const urgencyClass = alert.urgency === "high" ? "text-red" : "text-yellow"
+            const urgencyIcon = alert.urgency === "high" ? "🚨" : "⚠️"
+
+            content += `
+              <tr>
+                <td><strong>${alert.name}</strong></td>
+                <td class="text-center">${alert.current}</td>
+                <td class="text-center">${alert.minimum}</td>
+                <td class="text-center">${alert.unit}</td>
+                <td class="text-center ${urgencyClass}">${urgencyIcon} ${alert.urgency === "high" ? "Alta" : "Media"}</td>
+              </tr>
+            `
+          })
+
+          content += `
+                </tbody>
+              </table>
+            </div>
+          `
+        }
+
+        // ITEMS SIN STOCK
+        if (data.sinStock) {
+          content += `
+            <div class="section">
+              <div class="section-title">🚫 ITEMS SIN STOCK</div>
+              <table>
+                <thead>
+                  <tr>
+                    <th>🏷️ Producto</th>
+                    <th>📦 Stock Actual</th>
+                    <th>📊 Stock Mínimo</th>
+                    <th>📏 Unidad</th>
+                    <th>📅 Última Actualización</th>
+                  </tr>
+                </thead>
+                <tbody>
+          `
+
+          data.sinStock.forEach((item: any) => {
+            const date = new Date(item.updated_at).toLocaleDateString("es-CO")
+            content += `
+              <tr>
+                <td><strong>${item.name}</strong></td>
+                <td class="text-center text-red">${item.quantity}</td>
+                <td class="text-center">${item.min_quantity}</td>
+                <td class="text-center">${item.unit}</td>
+                <td class="text-center">${date}</td>
+              </tr>
+            `
+          })
+
+          content += `
+                </tbody>
+              </table>
+            </div>
+          `
+        }
+
+        // MOVIMIENTOS DE INVENTARIO
+        if (data.movimientos) {
+          content += `
+            <div class="section">
+              <div class="section-title">📊 MOVIMIENTOS DE INVENTARIO</div>
+              <table>
+                <thead>
+                  <tr>
+                    <th>📅 Fecha</th>
+                    <th>🏷️ Producto</th>
+                    <th>📦 Tipo</th>
+                    <th>📊 Cantidad</th>
+                    <th>📏 Unidad</th>
+                    <th>📝 Razón</th>
+                  </tr>
+                </thead>
+                <tbody>
+          `
+
+          data.movimientos.forEach((movement: any) => {
+            const date = new Date(movement.created_at).toLocaleDateString("es-CO")
+            const type = movement.movement_type === "in" ? "Entrada" : "Salida"
+            const typeClass = movement.movement_type === "in" ? "text-green" : "text-red"
+            const typeIcon = movement.movement_type === "in" ? "📥" : "📤"
+
+            content += `
+              <tr>
+                <td class="text-center">${date}</td>
+                <td><strong>${movement.inventory_items?.name || "N/A"}</strong></td>
+                <td class="text-center ${typeClass}">${typeIcon} ${type}</td>
+                <td class="text-center">${movement.quantity}</td>
+                <td class="text-center">${movement.inventory_items?.unit || "N/A"}</td>
+                <td>${movement.reason}</td>
               </tr>
             `
           })
@@ -811,12 +1239,6 @@ export function ExportDropdown({ data, filename, elementId, startDate, endDate, 
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="outline" disabled={isExporting} className="min-w-[140px]">
-          <Download className="h-4 w-4 mr-2" />
-          {isExporting ? "Exportando..." : "📄 Exportar"}
-        </Button>
-      </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-64">
         <DropdownMenuLabel>📊 Formato de Exportación</DropdownMenuLabel>
         <DropdownMenuSeparator />
@@ -825,13 +1247,6 @@ export function ExportDropdown({ data, filename, elementId, startDate, endDate, 
           <div className="flex flex-col">
             <span className="font-medium">📄 Documento PDF</span>
             <span className="text-xs text-muted-foreground">Se abre en navegador para imprimir</span>
-          </div>
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={exportToExcel} className="cursor-pointer">
-          <FileSpreadsheet className="h-4 w-4 mr-2" />
-          <div className="flex flex-col">
-            <span className="font-medium">📊 Hoja Excel</span>
-            <span className="text-xs text-muted-foreground">CSV con separador punto y coma</span>
           </div>
         </DropdownMenuItem>
       </DropdownMenuContent>
