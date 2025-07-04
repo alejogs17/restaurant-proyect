@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/Componentes/ui/label"
 import { useToast } from "@/Componentes/ui/use-toast"
 import { createClient } from "@/lib/supabase/client"
+import jsPDF from "jspdf"
 
 interface Invoice {
   id: number
@@ -172,33 +173,51 @@ export function InvoiceList({ searchTerm }: InvoiceListProps) {
     }
   }
 
-  const generatePDF = async (invoice: Invoice) => {
+  const generatePDF = async (invoice: Invoice, printDirectly = false) => {
     try {
-      // Aquí implementarías la generación de PDF
-      // Por ahora, mostraremos un mensaje
-      toast({
-        title: "Generando PDF",
-        description: "La factura se está generando...",
-      })
-
-      // Simular descarga
-      setTimeout(() => {
-        const link = document.createElement("a")
-        link.href = "#"
-        link.download = `factura-${invoice.invoice_number}.pdf`
-        link.click()
-
+      const doc = new jsPDF();
+      // Título
+      doc.setFontSize(18);
+      doc.text("Factura", 14, 20);
+      doc.setFontSize(12);
+      doc.text(`Número: ${invoice.invoice_number}`, 14, 30);
+      doc.text(`Cliente: ${invoice.customer_name || "-"}`, 14, 38);
+      doc.text(`Correo: ${invoice.customer_email || "-"}`, 14, 46);
+      doc.text(`Fecha: ${new Date(invoice.created_at).toLocaleString()}`, 14, 54);
+      doc.text(`Estado: ${getStatusLabel(invoice.status)}`, 14, 62);
+      doc.text(`Subtotal: $${invoice.subtotal.toFixed(2)}`, 14, 70);
+      doc.text(`Descuento: $${invoice.discount.toFixed(2)}`, 14, 78);
+      doc.text(`Total: $${invoice.total.toFixed(2)}`, 14, 86);
+      // Detalles de la orden (si existen)
+      if (invoice.orders) {
+        doc.text(`Orden: ${invoice.orders.order_number}`, 14, 102);
+        if (invoice.orders.tables && invoice.orders.tables.name) {
+          doc.text(`Mesa: ${invoice.orders.tables.name}`, 14, 110);
+        }
+      }
+      // Pie de página
+      doc.setFontSize(10);
+      doc.text("Gracias por su compra", 14, 140);
+      if (printDirectly) {
+        doc.autoPrint && doc.autoPrint();
+        window.open(doc.output('bloburl'), '_blank');
+        toast({
+          title: "Imprimiendo PDF",
+          description: "Se ha enviado el PDF a la impresora",
+        });
+      } else {
+        doc.save(`factura-${invoice.invoice_number}.pdf`);
         toast({
           title: "PDF generado",
           description: "La factura ha sido descargada",
-        })
-      }, 2000)
+        });
+      }
     } catch (error: any) {
       toast({
         title: "Error",
         description: "No se pudo generar el PDF",
         variant: "destructive",
-      })
+      });
     }
   }
 
@@ -273,6 +292,9 @@ export function InvoiceList({ searchTerm }: InvoiceListProps) {
                   {invoice.orders && (
                     <Badge variant="outline">Pedido #{invoice.orders.order_number}</Badge>
                   )}
+                  {invoice.orders?.tables?.name && (
+                    <Badge variant="outline">Mesa: {invoice.orders.tables.name}</Badge>
+                  )}
                 </div>
               </div>
               <DropdownMenu>
@@ -285,7 +307,7 @@ export function InvoiceList({ searchTerm }: InvoiceListProps) {
                   <DropdownMenuItem onClick={() => { setSelectedInvoice(invoice); setShowDetailsDialog(true); }}>
                     <Eye className="mr-2 h-4 w-4" /> Ver Detalles
                   </DropdownMenuItem>
-                  <DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => generatePDF(invoice, true)}>
                     <Printer className="mr-2 h-4 w-4" /> Imprimir
                   </DropdownMenuItem>
                   {invoice.status === 'draft' && (
@@ -351,7 +373,6 @@ export function InvoiceList({ searchTerm }: InvoiceListProps) {
                 <h3 className="text-lg font-semibold mb-2">Detalles del Monto</h3>
                 <div className="space-y-1">
                   <div className="flex justify-between"><span>Subtotal:</span> <span>{formatCurrency(selectedInvoice.subtotal)}</span></div>
-                  <div className="flex justify-between"><span>Impuestos:</span> <span>{formatCurrency(selectedInvoice.tax)}</span></div>
                   <div className="flex justify-between"><span>Descuento:</span> <span className="text-red-500">-{formatCurrency(selectedInvoice.discount)}</span></div>
                   <div className="flex justify-between items-center font-bold text-xl border-t pt-2 mt-2">
                     <span>Total:</span>
@@ -361,7 +382,7 @@ export function InvoiceList({ searchTerm }: InvoiceListProps) {
               </div>
 
               <div className="flex gap-2 mt-4">
-                <Button variant="outline" onClick={() => { /* Lógica de impresión */ }}>
+                <Button variant="outline" onClick={() => generatePDF(selectedInvoice, true)}>
                   <Printer className="mr-2 h-4 w-4" /> Imprimir
                 </Button>
                 <Button variant="outline" onClick={() => generatePDF(selectedInvoice)}>

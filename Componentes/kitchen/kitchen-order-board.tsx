@@ -7,6 +7,7 @@ import { Badge } from "@/Componentes/ui/badge"
 import { Button } from "@/Componentes/ui/button"
 import { useToast } from "@/Componentes/ui/use-toast"
 import { createClient } from "@/lib/supabase/client"
+import jsPDF from "jspdf"
 
 type OrderStatus = "pending" | "preparing" | "ready"
 
@@ -167,6 +168,31 @@ export function KitchenOrderBoard({ status, autoRefresh }: KitchenOrderBoardProp
     return "border-green-500 bg-green-50"
   }
 
+  const printOrder = (order: KitchenOrder) => {
+    const doc = new jsPDF();
+    doc.setFontSize(16);
+    doc.text("Orden de Preparación", 14, 20);
+    doc.setFontSize(12);
+    doc.text(`Orden: ${order.order_number}`, 14, 30);
+    doc.text(`Mesa: ${order.tables?.name || "-"}`, 14, 38);
+    doc.text(`Tipo: ${getOrderTypeLabel(order.order_type)}`, 14, 46);
+    doc.text(`Cliente: ${order.customer_name || "-"}`, 14, 54);
+    doc.text(`Fecha: ${new Date(order.created_at).toLocaleString()}`, 14, 62);
+    doc.text("Productos:", 14, 72);
+    let y = 80;
+    order.order_items.forEach((item, idx) => {
+      doc.text(
+        `${item.quantity} x ${item.products.name}${item.notes ? " (" + item.notes + ")" : ""}`,
+        18,
+        y + idx * 8
+      );
+    });
+    doc.setFontSize(10);
+    doc.text("--- Fin de la orden ---", 14, y + order.order_items.length * 8 + 10);
+    doc.autoPrint && doc.autoPrint();
+    window.open(doc.output('bloburl'), '_blank');
+  }
+
   if (loading) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -281,6 +307,10 @@ export function KitchenOrderBoard({ status, autoRefresh }: KitchenOrderBoardProp
                   </div>
                 )}
               </div>
+
+              <Button variant="outline" onClick={() => printOrder(order)}>
+                Imprimir Orden
+              </Button>
             </div>
           </CardContent>
         </Card>
