@@ -67,24 +67,40 @@ export function CreateOrderDialog({ open, onOpenChange }: CreateOrderDialogProps
     if (open) {
       fetchTables()
       fetchProducts()
+      // Limpiar el formulario cuando se abre el diálogo
+      setOrderType("dine_in")
+      setTableId("")
+      setCustomerName("")
+      setCustomerPhone("")
+      setCustomerAddress("")
+      setNotes("")
+      setOrderItems([])
     }
   }, [open])
+
+  // Limpiar tableId cuando se cambie el tipo de orden
+  useEffect(() => {
+    if (orderType !== "dine_in") {
+      setTableId("")
+    }
+  }, [orderType])
 
   const fetchTables = async () => {
     try {
       const { data, error } = await supabase
         .from("tables")
         .select("id, name, status")
-        .eq("status", "available")
+        .in("status", ["available", "reserved"])
+        .order("name", { ascending: true })
 
       if (error) {
         console.error("Error fetching tables:", error)
         throw error
       }
 
-      // Ordenar por nombre en el cliente
-      const sortedData = data ? data.sort((a: Table, b: Table) => a.name.localeCompare(b.name)) : []
-      setTables(sortedData)
+      // Filtrar y ordenar por nombre en el cliente
+      const availableTables = data ? data.filter((table: Table) => table.status === "available") : []
+      setTables(availableTables)
     } catch (error: any) {
       console.error("Error in fetchTables:", error)
       toast({
@@ -217,9 +233,25 @@ export function CreateOrderDialog({ open, onOpenChange }: CreateOrderDialogProps
       return
     }
 
+    // Validar que se haya seleccionado una mesa para pedidos en mesa
+    if (orderType === "dine_in" && !tableId) {
+      toast({
+        title: "Error",
+        description: "Debe seleccionar una mesa para pedidos en mesa",
+        variant: "destructive",
+      })
+      setLoading(false)
+      return
+    }
+
     try {
       const { subtotal, tax, total } = calculateTotal()
       const orderNumber = generateOrderNumber()
+
+      // Debug: mostrar información de la mesa seleccionada
+      console.log("Tipo de orden:", orderType)
+      console.log("Mesa seleccionada:", tableId)
+      console.log("Mesas disponibles:", tables)
 
       // Get current user
       const {
@@ -287,7 +319,11 @@ export function CreateOrderDialog({ open, onOpenChange }: CreateOrderDialogProps
       setNotes("")
       setOrderItems([])
       onOpenChange(false)
-      window.location.reload()
+      
+      // Recargar la página después de un breve delay para asegurar que se guarde la orden
+      setTimeout(() => {
+        window.location.reload()
+      }, 500)
     } catch (error: any) {
       toast({
         title: "Error",

@@ -18,6 +18,8 @@ interface Invoice {
   order_id: number
   customer_name?: string
   customer_email?: string
+  customer_phone?: string
+  customer_address?: string
   subtotal: number
   tax: number
   discount: number
@@ -172,27 +174,632 @@ export function InvoiceList({ searchTerm }: InvoiceListProps) {
     }
   }
 
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat("es-CO", {
+      style: "currency", currency: "COP", minimumFractionDigits: 0,
+    }).format(amount)
+  }
+
+  const getCurrentDateTime = () => {
+    const now = new Date()
+    return {
+      date: now.toLocaleDateString("es-CO", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      }),
+      time: now.toLocaleTimeString("es-CO", {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+      timestamp: now.toISOString().slice(0, 19).replace(/:/g, "-"),
+    }
+  }
+
+  const printInvoice = (invoice: Invoice) => {
+    const dateTime = getCurrentDateTime()
+    
+    // Crear contenido HTML para impresión
+    const printContent = `
+      <!DOCTYPE html>
+      <html lang="es">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Factura ${invoice.invoice_number}</title>
+        <style>
+          @page {
+            margin: 1.5cm;
+            size: A4;
+          }
+          
+          body {
+            font-family: 'Arial', sans-serif;
+            line-height: 1.4;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            font-size: 12px;
+          }
+          
+          /* ENCABEZADO */
+          .header {
+            text-align: center;
+            border-bottom: 4px solid #1e40af;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            padding: 20px;
+            border-radius: 8px;
+          }
+          
+          .company-logo {
+            font-size: 32px;
+            font-weight: bold;
+            color: #1e40af;
+            margin-bottom: 8px;
+            letter-spacing: 3px;
+          }
+          
+          .invoice-title {
+            font-size: 24px;
+            color: #374151;
+            margin-bottom: 10px;
+            font-weight: 600;
+          }
+          
+          .invoice-number {
+            font-size: 18px;
+            color: #1e40af;
+            background-color: #dbeafe;
+            padding: 8px 16px;
+            border-radius: 20px;
+            display: inline-block;
+            font-weight: 600;
+          }
+          
+          /* INFORMACIÓN DE LA FACTURA */
+          .invoice-info {
+            background-color: #f8fafc;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 30px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+          }
+          
+          .info-section h3 {
+            color: #1e40af;
+            font-size: 14px;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #cbd5e1;
+            padding-bottom: 5px;
+          }
+          
+          .info-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            padding: 4px 0;
+          }
+          
+          .info-label {
+            font-weight: 600;
+            color: #475569;
+          }
+          
+          .info-value {
+            color: #1e293b;
+            font-weight: 500;
+          }
+          
+          /* DETALLES DE LA FACTURA */
+          .invoice-details {
+            margin-bottom: 40px;
+          }
+          
+          .details-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #1e40af;
+            margin-bottom: 15px;
+            padding: 10px 0;
+            border-bottom: 3px solid #e2e8f0;
+            background: linear-gradient(90deg, #dbeafe 0%, transparent 100%);
+            padding-left: 15px;
+          }
+          
+          .amount-details {
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+            border: 2px solid #0ea5e9;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+          }
+          
+          .amount-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            padding: 8px 0;
+            border-bottom: 1px solid #e2e8f0;
+          }
+          
+          .amount-row:last-child {
+            border-bottom: none;
+            font-weight: bold;
+            font-size: 18px;
+            color: #1e40af;
+            border-top: 2px solid #0ea5e9;
+            padding-top: 12px;
+            margin-top: 12px;
+          }
+          
+          .total-amount {
+            color: #059669 !important;
+            font-size: 24px !important;
+            font-family: 'Courier New', monospace;
+          }
+          
+          /* PIE DE PÁGINA */
+          .footer {
+            margin-top: 50px;
+            padding-top: 20px;
+            border-top: 2px solid #e2e8f0;
+            background-color: #f8fafc;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+          }
+          
+          .footer-info {
+            font-size: 10px;
+            color: #6b7280;
+            margin-top: 20px;
+          }
+          
+          .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            color: white;
+            text-transform: uppercase;
+          }
+          
+          .status-paid { background-color: #059669; }
+          .status-sent { background-color: #3b82f6; }
+          .status-draft { background-color: #6b7280; }
+          .status-overdue { background-color: #dc2626; }
+          .status-cancelled { background-color: #991b1b; }
+          
+          @media print {
+            .no-print { display: none !important; }
+            body { print-color-adjust: exact; }
+          }
+        </style>
+      </head>
+      <body>
+        <!-- ENCABEZADO -->
+        <div class="header">
+          <div class="company-logo">🍽️ RESTAURANTE OS</div>
+          <div class="invoice-title">FACTURA</div>
+          <div class="invoice-number">#${invoice.invoice_number}</div>
+        </div>
+
+        <!-- INFORMACIÓN DE LA FACTURA -->
+        <div class="invoice-info">
+          <div class="info-section">
+            <h3>👤 Información del Cliente</h3>
+            <div class="info-item">
+              <span class="info-label">Nombre:</span>
+              <span class="info-value">${invoice.customer_name || 'Cliente General'}</span>
+            </div>
+            ${invoice.customer_email ? `
+            <div class="info-item">
+              <span class="info-label">Email:</span>
+              <span class="info-value">${invoice.customer_email}</span>
+            </div>
+            ` : ''}
+            ${invoice.customer_phone ? `
+            <div class="info-item">
+              <span class="info-label">Teléfono:</span>
+              <span class="info-value">${invoice.customer_phone}</span>
+            </div>
+            ` : ''}
+            ${invoice.customer_address ? `
+            <div class="info-item">
+              <span class="info-label">Dirección:</span>
+              <span class="info-value">${invoice.customer_address}</span>
+            </div>
+            ` : ''}
+          </div>
+          <div class="info-section">
+            <h3>📋 Información de la Factura</h3>
+            <div class="info-item">
+              <span class="info-label">Fecha de Emisión:</span>
+              <span class="info-value">${new Date(invoice.created_at).toLocaleDateString("es-CO")}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Fecha de Vencimiento:</span>
+              <span class="info-value">${new Date(invoice.due_date).toLocaleDateString("es-CO")}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Estado:</span>
+              <span class="info-value">
+                <span class="status-badge status-${invoice.status}">${getStatusLabel(invoice.status)}</span>
+              </span>
+            </div>
+            ${invoice.orders?.order_number ? `
+            <div class="info-item">
+              <span class="info-label">Pedido Relacionado:</span>
+              <span class="info-value">#${invoice.orders.order_number}</span>
+            </div>
+            ` : ''}
+          </div>
+        </div>
+
+        <!-- DETALLES DE LA FACTURA -->
+        <div class="invoice-details">
+          <div class="details-title">💰 Detalles del Monto</div>
+          <div class="amount-details">
+            <div class="amount-row">
+              <span>Subtotal:</span>
+              <span>${formatCurrency(invoice.subtotal)}</span>
+            </div>
+            <div class="amount-row">
+              <span>Impuestos:</span>
+              <span>${formatCurrency(invoice.tax)}</span>
+            </div>
+            <div class="amount-row">
+              <span>Descuento:</span>
+              <span style="color: #dc2626;">-${formatCurrency(invoice.discount)}</span>
+            </div>
+            <div class="amount-row">
+              <span>Total:</span>
+              <span class="total-amount">${formatCurrency(invoice.total)}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- PIE DE PÁGINA -->
+        <div class="footer">
+          <div class="footer-info">
+            <p><strong>🍽️ RESTAURANTE OS</strong> - Sistema de Gestión Integral</p>
+            <p>📄 Factura generada el ${dateTime.date} a las ${dateTime.time}</p>
+            <p>💰 Moneda: Pesos Colombianos (COP) | 📊 Sistema: RestauranteOS v1.0</p>
+            <p>⚠️ Este documento es una representación oficial de la factura</p>
+            <p>© ${new Date().getFullYear()} RestauranteOS - Todos los derechos reservados</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `
+
+    // Crear ventana de impresión
+    const printWindow = window.open('', '_blank')
+    if (printWindow) {
+      printWindow.document.write(printContent)
+      printWindow.document.close()
+      printWindow.focus()
+      
+      // Esperar a que se cargue el contenido y luego imprimir
+      printWindow.onload = () => {
+        printWindow.print()
+        printWindow.close()
+      }
+      
+      toast({
+        title: "Imprimiendo factura",
+        description: `La factura ${invoice.invoice_number} se está imprimiendo...`,
+      })
+    }
+  }
+
   const generatePDF = async (invoice: Invoice) => {
     try {
-      // Aquí implementarías la generación de PDF
-      // Por ahora, mostraremos un mensaje
+      const dateTime = getCurrentDateTime()
+      
       toast({
         title: "Generando PDF",
         description: "La factura se está generando...",
       })
 
-      // Simular descarga
-      setTimeout(() => {
-        const link = document.createElement("a")
-        link.href = "#"
-        link.download = `factura-${invoice.invoice_number}.pdf`
-        link.click()
+      // Crear contenido HTML para PDF (similar al de impresión pero optimizado para PDF)
+      const pdfContent = `
+        <!DOCTYPE html>
+        <html lang="es">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Factura ${invoice.invoice_number}</title>
+          <style>
+            @page {
+              margin: 1.5cm;
+              size: A4;
+            }
+            
+            body {
+              font-family: 'Arial', sans-serif;
+              line-height: 1.4;
+              color: #333;
+              margin: 0;
+              padding: 0;
+              font-size: 12px;
+            }
+            
+            /* ENCABEZADO */
+            .header {
+              text-align: center;
+              border-bottom: 4px solid #1e40af;
+              padding-bottom: 20px;
+              margin-bottom: 30px;
+              background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+              padding: 20px;
+              border-radius: 8px;
+            }
+            
+            .company-logo {
+              font-size: 32px;
+              font-weight: bold;
+              color: #1e40af;
+              margin-bottom: 8px;
+              letter-spacing: 3px;
+            }
+            
+            .invoice-title {
+              font-size: 24px;
+              color: #374151;
+              margin-bottom: 10px;
+              font-weight: 600;
+            }
+            
+            .invoice-number {
+              font-size: 18px;
+              color: #1e40af;
+              background-color: #dbeafe;
+              padding: 8px 16px;
+              border-radius: 20px;
+              display: inline-block;
+              font-weight: 600;
+            }
+            
+            /* INFORMACIÓN DE LA FACTURA */
+            .invoice-info {
+              background-color: #f8fafc;
+              border: 2px solid #e2e8f0;
+              border-radius: 10px;
+              padding: 20px;
+              margin-bottom: 30px;
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: 20px;
+            }
+            
+            .info-section h3 {
+              color: #1e40af;
+              font-size: 14px;
+              margin-bottom: 10px;
+              border-bottom: 1px solid #cbd5e1;
+              padding-bottom: 5px;
+            }
+            
+            .info-item {
+              display: flex;
+              justify-content: space-between;
+              margin-bottom: 8px;
+              padding: 4px 0;
+            }
+            
+            .info-label {
+              font-weight: 600;
+              color: #475569;
+            }
+            
+            .info-value {
+              color: #1e293b;
+              font-weight: 500;
+            }
+            
+            /* DETALLES DE LA FACTURA */
+            .invoice-details {
+              margin-bottom: 40px;
+            }
+            
+            .details-title {
+              font-size: 18px;
+              font-weight: bold;
+              color: #1e40af;
+              margin-bottom: 15px;
+              padding: 10px 0;
+              border-bottom: 3px solid #e2e8f0;
+              background: linear-gradient(90deg, #dbeafe 0%, transparent 100%);
+              padding-left: 15px;
+            }
+            
+            .amount-details {
+              background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+              border: 2px solid #0ea5e9;
+              border-radius: 10px;
+              padding: 20px;
+              margin: 20px 0;
+            }
+            
+            .amount-row {
+              display: flex;
+              justify-content: space-between;
+              margin-bottom: 12px;
+              padding: 8px 0;
+              border-bottom: 1px solid #e2e8f0;
+            }
+            
+            .amount-row:last-child {
+              border-bottom: none;
+              font-weight: bold;
+              font-size: 18px;
+              color: #1e40af;
+              border-top: 2px solid #0ea5e9;
+              padding-top: 12px;
+              margin-top: 12px;
+            }
+            
+            .total-amount {
+              color: #059669 !important;
+              font-size: 24px !important;
+              font-family: 'Courier New', monospace;
+            }
+            
+            /* PIE DE PÁGINA */
+            .footer {
+              margin-top: 50px;
+              padding-top: 20px;
+              border-top: 2px solid #e2e8f0;
+              background-color: #f8fafc;
+              padding: 20px;
+              border-radius: 8px;
+              text-align: center;
+            }
+            
+            .footer-info {
+              font-size: 10px;
+              color: #6b7280;
+              margin-top: 20px;
+            }
+            
+            .status-badge {
+              display: inline-block;
+              padding: 4px 12px;
+              border-radius: 20px;
+              font-size: 12px;
+              font-weight: bold;
+              color: white;
+              text-transform: uppercase;
+            }
+            
+            .status-paid { background-color: #059669; }
+            .status-sent { background-color: #3b82f6; }
+            .status-draft { background-color: #6b7280; }
+            .status-overdue { background-color: #dc2626; }
+            .status-cancelled { background-color: #991b1b; }
+            
+            @media print {
+              .no-print { display: none !important; }
+              body { print-color-adjust: exact; }
+            }
+          </style>
+        </head>
+        <body>
+          <!-- ENCABEZADO -->
+          <div class="header">
+            <div class="company-logo">🍽️ RESTAURANTE OS</div>
+            <div class="invoice-title">FACTURA</div>
+            <div class="invoice-number">#${invoice.invoice_number}</div>
+          </div>
 
-        toast({
-          title: "PDF generado",
-          description: "La factura ha sido descargada",
-        })
-      }, 2000)
+          <!-- INFORMACIÓN DE LA FACTURA -->
+          <div class="invoice-info">
+            <div class="info-section">
+              <h3>👤 Información del Cliente</h3>
+              <div class="info-item">
+                <span class="info-label">Nombre:</span>
+                <span class="info-value">${invoice.customer_name || 'Cliente General'}</span>
+              </div>
+              ${invoice.customer_email ? `
+              <div class="info-item">
+                <span class="info-label">Email:</span>
+                <span class="info-value">${invoice.customer_email}</span>
+              </div>
+              ` : ''}
+              ${invoice.customer_phone ? `
+              <div class="info-item">
+                <span class="info-label">Teléfono:</span>
+                <span class="info-value">${invoice.customer_phone}</span>
+              </div>
+              ` : ''}
+              ${invoice.customer_address ? `
+              <div class="info-item">
+                <span class="info-label">Dirección:</span>
+                <span class="info-value">${invoice.customer_address}</span>
+              </div>
+              ` : ''}
+            </div>
+            <div class="info-section">
+              <h3>📋 Información de la Factura</h3>
+              <div class="info-item">
+                <span class="info-label">Fecha de Emisión:</span>
+                <span class="info-value">${new Date(invoice.created_at).toLocaleDateString("es-CO")}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Fecha de Vencimiento:</span>
+                <span class="info-value">${new Date(invoice.due_date).toLocaleDateString("es-CO")}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Estado:</span>
+                <span class="info-value">
+                  <span class="status-badge status-${invoice.status}">${getStatusLabel(invoice.status)}</span>
+                </span>
+              </div>
+              ${invoice.orders?.order_number ? `
+              <div class="info-item">
+                <span class="info-label">Pedido Relacionado:</span>
+                <span class="info-value">#${invoice.orders.order_number}</span>
+              </div>
+              ` : ''}
+            </div>
+          </div>
+
+          <!-- DETALLES DE LA FACTURA -->
+          <div class="invoice-details">
+            <div class="details-title">💰 Detalles del Monto</div>
+            <div class="amount-details">
+              <div class="amount-row">
+                <span>Subtotal:</span>
+                <span>${formatCurrency(invoice.subtotal)}</span>
+              </div>
+              <div class="amount-row">
+                <span>Impuestos:</span>
+                <span>${formatCurrency(invoice.tax)}</span>
+              </div>
+              <div class="amount-row">
+                <span>Descuento:</span>
+                <span style="color: #dc2626;">-${formatCurrency(invoice.discount)}</span>
+              </div>
+              <div class="amount-row">
+                <span>Total:</span>
+                <span class="total-amount">${formatCurrency(invoice.total)}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- PIE DE PÁGINA -->
+          <div class="footer">
+            <div class="footer-info">
+              <p><strong>🍽️ RESTAURANTE OS</strong> - Sistema de Gestión Integral</p>
+              <p>📄 Factura generada el ${dateTime.date} a las ${dateTime.time}</p>
+              <p>💰 Moneda: Pesos Colombianos (COP) | 📊 Sistema: RestauranteOS v1.0</p>
+              <p>⚠️ Este documento es una representación oficial de la factura</p>
+              <p>© ${new Date().getFullYear()} RestauranteOS - Todos los derechos reservados</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `
+
+      // Crear blob y descargar
+      const blob = new Blob([pdfContent], { type: "text/html;charset=utf-8;" })
+      const link = document.createElement("a")
+      link.href = URL.createObjectURL(blob)
+      link.download = `factura_${invoice.invoice_number}_${dateTime.timestamp}.html`
+      link.click()
+
+      toast({
+        title: "✅ PDF Generado Exitosamente",
+        description: `Documento profesional descargado. Ábrelo en tu navegador y usa Ctrl+P para imprimir como PDF.`,
+        duration: 8000,
+      })
     } catch (error: any) {
       toast({
         title: "Error",
@@ -222,12 +829,6 @@ export function InvoiceList({ searchTerm }: InvoiceListProps) {
       case "cancelled": return "Cancelada"
       default: return status
     }
-  }
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("es-CO", {
-      style: "currency", currency: "COP", minimumFractionDigits: 0,
-    }).format(amount)
   }
 
   const filteredInvoices = invoices.filter(
@@ -285,8 +886,11 @@ export function InvoiceList({ searchTerm }: InvoiceListProps) {
                   <DropdownMenuItem onClick={() => { setSelectedInvoice(invoice); setShowDetailsDialog(true); }}>
                     <Eye className="mr-2 h-4 w-4" /> Ver Detalles
                   </DropdownMenuItem>
-                  <DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => printInvoice(invoice)}>
                     <Printer className="mr-2 h-4 w-4" /> Imprimir
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => generatePDF(invoice)}>
+                    <Download className="mr-2 h-4 w-4" /> Descargar PDF
                   </DropdownMenuItem>
                   {invoice.status === 'draft' && (
                     <DropdownMenuItem onClick={() => updateInvoiceStatus(invoice.id, 'sent')}>
@@ -361,7 +965,7 @@ export function InvoiceList({ searchTerm }: InvoiceListProps) {
               </div>
 
               <div className="flex gap-2 mt-4">
-                <Button variant="outline" onClick={() => { /* Lógica de impresión */ }}>
+                <Button variant="outline" onClick={() => printInvoice(selectedInvoice)}>
                   <Printer className="mr-2 h-4 w-4" /> Imprimir
                 </Button>
                 <Button variant="outline" onClick={() => generatePDF(selectedInvoice)}>

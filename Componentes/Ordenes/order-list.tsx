@@ -339,10 +339,10 @@ export function OrderList({ searchTerm, statusFilter, tabFilter }: OrderListProp
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
-                {order.table_id && (
+                {order.tables && (
                   <p className="text-sm text-muted-foreground flex items-center gap-1">
                     <User className="h-3 w-3" />
-                    Mesa {order.table_id}
+                    {order.tables.name}
                   </p>
                 )}
                 {order.customer_name && (
