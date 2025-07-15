@@ -22,6 +22,8 @@ export function SalesReport({ dateRange, startDate, endDate }: SalesReportProps)
   const [peakHour, setPeakHour] = useState<string>("")
   const [paymentMethods, setPaymentMethods] = useState<any[]>([])
   const [topWaiters, setTopWaiters] = useState<any[]>([])
+  const [soldProducts, setSoldProducts] = useState<any[]>([])
+  const [soldOrders, setSoldOrders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const supabase = createClient()
 
@@ -151,6 +153,50 @@ export function SalesReport({ dateRange, startDate, endDate }: SalesReportProps)
       const sortedWaiters = Object.values(waiterMap).sort((a, b) => b.sales - a.sales).slice(0, 4)
       setTopWaiters(sortedWaiters)
       
+      // 5. Productos vendidos en el período
+      const { data: ordersWithItems, error: orderItemsError } = await supabase
+        .from('orders')
+        .select(`id, created_at, total, order_items (product_id, quantity, total_price, products (name))`)
+        .gte('created_at', startDate.toISOString())
+        .lte('created_at', endDate.toISOString())
+        .eq('status', 'completed')
+
+      if (orderItemsError) {
+        console.error('Error fetching order items:', orderItemsError)
+      } else {
+        // Mapear productos vendidos
+        const productMap: Record<string, { name: string, sold: number, revenue: number }> = {}
+        ordersWithItems?.forEach((order: any) => {
+          order.order_items?.forEach((item: any) => {
+            const productId = item.product_id
+            if (!productMap[productId]) {
+              productMap[productId] = {
+                name: item.products?.name || 'Sin nombre',
+                sold: 0,
+                revenue: 0
+              }
+            }
+            productMap[productId].sold += item.quantity || 0
+            productMap[productId].revenue += item.total_price || 0
+          })
+        })
+        setSoldProducts(Object.values(productMap).sort((a, b) => b.sold - a.sold))
+
+        // Guardar detalle de órdenes vendidas
+        setSoldOrders(
+          ordersWithItems?.map((order: any) => ({
+            id: order.id,
+            date: order.created_at,
+            total: order.total,
+            items: order.order_items?.map((item: any) => ({
+              name: item.products?.name || 'Sin nombre',
+              quantity: item.quantity,
+              total: item.total_price
+            })) || []
+          })) || []
+        )
+      }
+      
     } catch (error) {
       console.error('Error fetching sales data:', error)
       console.error('Full error object:', JSON.stringify(error, null, 2))
@@ -161,6 +207,7 @@ export function SalesReport({ dateRange, startDate, endDate }: SalesReportProps)
       setPeakHour("")
       setPaymentMethods([])
       setTopWaiters([])
+      setSoldProducts([])
     } finally {
       setLoading(false)
     }
@@ -191,6 +238,8 @@ export function SalesReport({ dateRange, startDate, endDate }: SalesReportProps)
             },
             metodosPago: paymentMethods,
             mejoresMeseros: topWaiters,
+            productosVendidos: soldProducts,
+            ordenesVendidas: soldOrders,
           }}
           filename="reporte_ventas"
           elementId="sales-report-content"
@@ -339,6 +388,50 @@ export function SalesReport({ dateRange, startDate, endDate }: SalesReportProps)
               ) : (
                 <div className="text-center py-8 text-muted-foreground">
                   No hay datos de meseros para el período seleccionado
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Productos vendidos */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">🛍️ Productos Vendidos</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Lista de productos vendidos con cantidad y monto total por producto
+              </p>
+            </CardHeader>
+            <CardContent>
+              {soldProducts.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Producto
+                        </th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Cantidad Vendida
+                        </th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Monto Total
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {soldProducts.map((product, index) => (
+                        <tr key={index}>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{product.name}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{product.sold}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{formatCurrency(product.revenue)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  No hay datos de productos vendidos para el período seleccionado
                 </div>
               )}
             </CardContent>
