@@ -8,6 +8,9 @@ import { Button } from "@/Componentes/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/Componentes/ui/dropdown-menu"
 import { useToast } from "@/Componentes/ui/use-toast"
 import { createClient } from "@/lib/supabase/client"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/Componentes/ui/dialog"
+import { Input } from "@/Componentes/ui/input"
+import { Textarea } from "@/Componentes/ui/textarea"
 
 interface Category {
   id: number
@@ -27,6 +30,12 @@ export function CategoryManagement({ searchTerm }: CategoryManagementProps) {
   const [loading, setLoading] = useState(true)
   const { toast } = useToast()
   const supabase = createClient()
+
+  // Estado para edición
+  const [editDialogOpen, setEditDialogOpen] = useState(false)
+  const [categoryToEdit, setCategoryToEdit] = useState<Category | null>(null)
+  const [editForm, setEditForm] = useState({ name: "", description: "" })
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     fetchCategories()
@@ -109,50 +118,121 @@ export function CategoryManagement({ searchTerm }: CategoryManagementProps) {
   }
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-      {filteredCategories.map((category) => (
-        <Card key={category.id} className={`transition-all hover:shadow-lg ${!category.active ? "opacity-60" : ""}`}>
-          <CardHeader className="pb-3">
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <CardTitle className="text-lg">{category.name}</CardTitle>
-                <Badge variant={category.active ? "default" : "secondary"} className="mt-1">
-                  {category.active ? "Activa" : "Inactiva"}
-                </Badge>
+    <>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {filteredCategories.map((category) => (
+          <Card key={category.id} className={`transition-all hover:shadow-lg ${!category.active ? "opacity-60" : ""}`}>
+            <CardHeader className="pb-3">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <CardTitle className="text-lg">{category.name}</CardTitle>
+                  <Badge variant={category.active ? "default" : "secondary"} className="mt-1">
+                    {category.active ? "Activa" : "Inactiva"}
+                  </Badge>
+                </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => {
+                      setCategoryToEdit(category)
+                      setEditForm({ name: category.name, description: category.description || "" })
+                      setEditDialogOpen(true)
+                    }}>
+                      <Edit className="mr-2 h-4 w-4" />
+                      Editar
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => toggleCategoryStatus(category.id, category.active)}>
+                      {category.active ? (
+                        <>
+                          <EyeOff className="mr-2 h-4 w-4" />
+                          Desactivar
+                        </>
+                      ) : (
+                        <>
+                          <Eye className="mr-2 h-4 w-4" />
+                          Activar
+                        </>
+                      )}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                    <MoreHorizontal className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem>
-                    <Edit className="mr-2 h-4 w-4" />
-                    Editar
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => toggleCategoryStatus(category.id, category.active)}>
-                    {category.active ? (
-                      <>
-                        <EyeOff className="mr-2 h-4 w-4" />
-                        Desactivar
-                      </>
-                    ) : (
-                      <>
-                        <Eye className="mr-2 h-4 w-4" />
-                        Activar
-                      </>
-                    )}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">{category.description}</p>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+      {/* Diálogo de edición de categoría */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Editar Categoría</DialogTitle>
+          </DialogHeader>
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault()
+              if (!categoryToEdit) return
+              setSaving(true)
+              const { error } = await supabase
+                .from("categories")
+                .update({
+                  name: editForm.name,
+                  description: editForm.description,
+                  updated_at: new Date().toISOString(),
+                })
+                .eq("id", categoryToEdit.id)
+              if (error) {
+                toast({
+                  title: "Error",
+                  description: "No se pudo actualizar la categoría",
+                  variant: "destructive",
+                })
+              } else {
+                setEditDialogOpen(false)
+                setCategoryToEdit(null)
+                fetchCategories()
+                toast({
+                  title: "Categoría actualizada",
+                  description: "La categoría ha sido actualizada correctamente",
+                })
+              }
+              setSaving(false)
+            }}
+            className="space-y-4"
+          >
+            <div>
+              <label className="block text-sm font-medium">Nombre</label>
+              <Input
+                value={editForm.name}
+                onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
+                required
+              />
             </div>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">{category.description}</p>
-          </CardContent>
-        </Card>
-      ))}
-    </div>
+            <div>
+              <label className="block text-sm font-medium">Descripción</label>
+              <Textarea
+                value={editForm.description}
+                onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))}
+                rows={3}
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setEditDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={saving}>
+                {saving ? "Guardando..." : "Guardar"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }

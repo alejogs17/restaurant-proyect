@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/Componentes/ui/button"
 import {
   Dialog,
@@ -15,6 +15,7 @@ import { Label } from "@/Componentes/ui/label"
 import { Textarea } from "@/Componentes/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/Componentes/ui/select"
 import { useToast } from "@/Componentes/ui/use-toast"
+import { createClient } from "@/lib/supabase/client"
 
 interface CreateProductDialogProps {
   open: boolean
@@ -26,27 +27,57 @@ export function CreateProductDialog({ open, onOpenChange }: CreateProductDialogP
   const [description, setDescription] = useState("")
   const [price, setPrice] = useState("")
   const [category, setCategory] = useState("")
+  const [categories, setCategories] = useState<{ id: number; name: string }[]>([])
   const [loading, setLoading] = useState(false)
   const { toast } = useToast()
+  const supabase = createClient()
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      const { data, error } = await supabase
+        .from("categories")
+        .select("id, name")
+        .eq("active", true)
+        .order("name")
+      if (!error) setCategories(data || [])
+      else toast({ title: "Error", description: "No se pudieron cargar las categorías", variant: "destructive" })
+    }
+    if (open) fetchCategories()
+  }, [open])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
 
-    // Simular creación de producto
-    setTimeout(() => {
+    try {
+      const { error } = await supabase.from("products").insert([
+        {
+          name,
+          description,
+          price: Number(price),
+          category_id: Number(category),
+          active: true,
+        },
+      ])
+      if (error) throw error
       toast({
         title: "Producto creado",
         description: "El producto ha sido creado correctamente",
       })
-      setLoading(false)
       onOpenChange(false)
-      // Limpiar formulario
       setName("")
       setDescription("")
       setPrice("")
       setCategory("")
-    }, 1000)
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "No se pudo crear el producto",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -98,12 +129,9 @@ export function CreateProductDialog({ open, onOpenChange }: CreateProductDialogP
                   <SelectValue placeholder="Selecciona una categoría" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="1">Hamburguesas</SelectItem>
-                  <SelectItem value="2">Pizzas</SelectItem>
-                  <SelectItem value="3">Ensaladas</SelectItem>
-                  <SelectItem value="4">Pastas</SelectItem>
-                  <SelectItem value="5">Sopas</SelectItem>
-                  <SelectItem value="6">Postres</SelectItem>
+                  {categories.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.id.toString()}>{cat.name}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
