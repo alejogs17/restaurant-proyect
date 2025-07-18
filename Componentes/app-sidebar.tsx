@@ -191,8 +191,8 @@ function SidebarContent({ onLinkClick }: { onLinkClick?: () => void } = {}) {
           <span className="text-xl">RestaurantOS</span>
         </Link>
       </div>
-      <div className="flex-1 p-4 overflow-y-auto">
-        <nav className="space-y-2">
+      <div className="flex-1 p-4 overflow-y-auto flex flex-col">
+        <nav className="space-y-2 flex-1">
           {userNavItems.map(item => {
             const Icon = item.icon
             return (
@@ -209,17 +209,15 @@ function SidebarContent({ onLinkClick }: { onLinkClick?: () => void } = {}) {
               </Link>
             )
           })}
+          <button
+            type="button"
+            onClick={handleSignOut}
+            className="flex items-center gap-2 p-2 rounded-md transition-colors hover:bg-gray-100 w-full text-left"
+          >
+            <LogOut className="h-4 w-4" />
+            <span>Cerrar sesión</span>
+          </button>
         </nav>
-      </div>
-      <div className="absolute bottom-0 left-0 w-full p-4 border-t bg-background">
-        <Button
-          variant="ghost"
-          className="w-full flex items-center gap-2 p-2 rounded-md text-left hover:bg-gray-100 transition-colors"
-          onClick={handleSignOut}
-        >
-          <LogOut className="h-4 w-4" />
-          <span>Cerrar sesión</span>
-        </Button>
       </div>
     </div>
   )
@@ -238,7 +236,7 @@ export function AppSidebar({ isMobileOpen, onMobileClose }: AppSidebarProps) {
       <Sheet open={isMobileOpen} onOpenChange={onMobileClose}>
         <SheetContent 
           side="left" 
-          className="w-64 p-0" 
+          className="w-64 p-0 h-screen flex flex-col" // <-- Asegura altura y layout
           aria-labelledby="sidebar-mobile-title"
         >
           <SheetTitle className="sr-only">Menú de navegación</SheetTitle>
