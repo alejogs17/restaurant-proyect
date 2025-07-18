@@ -49,20 +49,35 @@ export function CreateProductDialog({ open, onOpenChange }: CreateProductDialogP
     e.preventDefault()
     setLoading(true)
 
-    // Simular creación de producto
-    setTimeout(() => {
+    try {
+      const { error } = await supabase.from("products").insert([
+        {
+          name,
+          description,
+          price: Number(price),
+          category_id: Number(category),
+          active: true,
+        },
+      ])
+      if (error) throw error
       toast({
         title: "Producto creado",
         description: "El producto ha sido creado correctamente",
       })
-      setLoading(false)
       onOpenChange(false)
-      // Limpiar formulario
       setName("")
       setDescription("")
       setPrice("")
       setCategory("")
-    }, 1000)
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "No se pudo crear el producto",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
