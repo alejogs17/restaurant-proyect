@@ -175,6 +175,17 @@ export function InvoiceList({ searchTerm }: InvoiceListProps) {
 
   const generatePDF = async (invoice: Invoice, printDirectly = false) => {
     try {
+      // 1. Consultar productos de la orden
+      let productos = []
+      if (invoice.order_id) {
+        const { data: items, error } = await supabase
+          .from("order_items")
+          .select("quantity, products(name)")
+          .eq("order_id", invoice.order_id)
+        if (!error && items) {
+          productos = items
+        }
+      }
       const doc = new jsPDF();
       // Título
       doc.setFontSize(18);
@@ -189,15 +200,30 @@ export function InvoiceList({ searchTerm }: InvoiceListProps) {
       doc.text(`Descuento: $${invoice.discount.toFixed(2)}`, 14, 78);
       doc.text(`Total: $${invoice.total.toFixed(2)}`, 14, 86);
       // Detalles de la orden (si existen)
+      let y = 102;
       if (invoice.orders) {
-        doc.text(`Orden: ${invoice.orders.order_number}`, 14, 102);
+        doc.text(`Orden: ${invoice.orders.order_number}`, 14, y);
+        y += 8;
         if (invoice.orders.tables && invoice.orders.tables.name) {
-          doc.text(`Mesa: ${invoice.orders.tables.name}`, 14, 110);
+          doc.text(`Mesa: ${invoice.orders.tables.name}`, 14, y);
+          y += 8;
         }
+      }
+      // 2. Agregar productos (siempre mostrar la sección)
+      doc.text("Productos:", 14, y);
+      y += 8;
+      if (productos.length > 0) {
+        productos.forEach((item: any) => {
+          doc.text(`- ${item.products?.name || "(Sin nombre)"} x${item.quantity}`, 16, y);
+          y += 8;
+        });
+      } else {
+        doc.text("No hay productos", 16, y);
+        y += 8;
       }
       // Pie de página
       doc.setFontSize(10);
-      doc.text("Gracias por su compra", 14, 140);
+      doc.text("Gracias por su compra", 14, y + 10);
       if (printDirectly) {
         doc.autoPrint && doc.autoPrint();
         window.open(doc.output('bloburl'), '_blank');
