@@ -101,17 +101,17 @@ export function CreateUserDialog({ open, onOpenChange, onUserCreated }: CreateUs
         throw new Error("No se pudo crear la cuenta de usuario")
       }
 
-      // 2. Crear el perfil del usuario
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert({
-          id: authData.user.id,
-          first_name: formData.firstName,
-          last_name: formData.lastName,
-          phone: formData.phone || null,
-          role: formData.role,
-          status: 'active'
-        })
+      // 2. Actualizar el perfil del usuario (ya fue creado por trigger)
+const { error: profileError } = await supabase
+.from('profiles')
+.update({
+  first_name: formData.firstName,
+  last_name: formData.lastName,
+  phone: formData.phone || null,
+  role: formData.role,
+  status: 'active'
+})
+.eq('id', authData.user.id)
 
       if (profileError) {
         console.error('Profile creation error:', profileError)
