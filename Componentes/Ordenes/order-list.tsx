@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import React, { useRef, useState, useEffect } from "react"
 import { MoreHorizontal, Clock, User, MapPin, Phone } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/Componentes/ui/card"
 import { Badge } from "@/Componentes/ui/badge"
@@ -66,9 +66,17 @@ export function OrderList({ searchTerm, statusFilter, tabFilter }: OrderListProp
   const [orderForPayment, setOrderForPayment] = useState<{ id: number; order_number: string; total: number } | null>(null)
   const { toast } = useToast()
   const supabase = createClient()
+  const printSectionRef = useRef<HTMLDivElement>(null)
+  const [paymentMethodForPrint, setPaymentMethodForPrint] = useState<string>("")
 
   useEffect(() => {
     fetchOrders()
+
+    // Auto refresh cada 10 segundos
+    const interval = setInterval(() => {
+      fetchOrders()
+    }, 10000)
+    return () => clearInterval(interval)
   }, [])
 
   const fetchOrders = async () => {
@@ -146,6 +154,9 @@ export function OrderList({ searchTerm, statusFilter, tabFilter }: OrderListProp
         title: "Estado actualizado",
         description: `El pedido ha sido marcado como ${getStatusLabel(newStatus)}`,
       })
+
+      // Cerrar el menú de detalles si está abierto
+      setShowDetailsDialog(false)
     } catch (error: any) {
       toast({
         title: "Error",
@@ -234,6 +245,43 @@ export function OrderList({ searchTerm, statusFilter, tabFilter }: OrderListProp
       total: order.total,
     })
     setShowPaymentDialog(true)
+  }
+
+  const fetchPaymentMethod = async (orderId: number) => {
+    try {
+      const { data, error } = await supabase
+        .from("payments")
+        .select("payment_method")
+        .eq("order_id", orderId)
+        .order("id", { ascending: false })
+        .limit(1)
+        .single()
+      if (error || !data) return "-"
+      // Mapear a nombre legible
+      switch (data.payment_method) {
+        case "cash": return "Efectivo"
+        case "credit_card": return "Tarjeta de Crédito"
+        case "debit_card": return "Tarjeta Débito"
+        case "mobile_payment": return "Nequi/Daviplata"
+        case "bank_transfer": return "Transferencia Bancaria"
+        default: return data.payment_method
+      }
+    } catch {
+      return "-"
+    }
+  }
+
+  const handlePrint = async (order: Order) => {
+    setSelectedOrder(order)
+    setShowDetailsDialog(false)
+    // Consultar método de pago antes de imprimir
+    const method = await fetchPaymentMethod(order.id)
+    setPaymentMethodForPrint(method)
+    setTimeout(() => {
+      if (printSectionRef.current) {
+        window.print()
+      }
+    }, 300)
   }
 
   const filteredOrders = orders.filter((order) => {
@@ -465,6 +513,29 @@ export function OrderList({ searchTerm, statusFilter, tabFilter }: OrderListProp
           )}
         </DialogContent>
       </Dialog>
+
+      <div style={{ display: "none" }}>
+        {selectedOrder && (
+          <div ref={printSectionRef} id="print-section" style={{ fontFamily: 'monospace', width: 320 }}>
+            <h1 style={{ textAlign: 'center', margin: 0, fontSize: 22 }}>Restaurante Demo</h1>
+            <h2 style={{ textAlign: 'center', marginBottom: 8 }}>Ticket de Pedido</h2>
+            <p><b>Fecha:</b> {new Date(selectedOrder.created_at).toLocaleString("es-ES")}</p>
+            <p><b>Mesa:</b> {selectedOrder.tables?.name || "-"}</p>
+            <hr />
+            <h3 style={{ margin: '8px 0 4px 0' }}>Productos</h3>
+            <ul style={{ paddingLeft: 0, listStyle: 'none' }}>
+              {selectedOrder.order_items?.map((item) => (
+                <li key={item.id} style={{ marginBottom: 4 }}>
+                  {item.products.name} x{item.quantity} - {formatCurrency(item.total_price)}
+                </li>
+              ))}
+            </ul>
+            <hr />
+            <p style={{ fontSize: 18, margin: '8px 0' }}><b>Total: {formatCurrency(selectedOrder.total)}</b></p>
+            <p><b>Método de pago:</b> {paymentMethodForPrint || '-'}</p>
+          </div>
+        )}
+      </div>
     </>
   )
 }

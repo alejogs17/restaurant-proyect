@@ -63,12 +63,25 @@ export function CreateOrderDialog({ open, onOpenChange }: CreateOrderDialogProps
   const { toast } = useToast()
   const supabase = createClient()
 
+  // 1. AGREGAR ESTADOS PARA CATEGORÍA Y BÚSQUEDA
+  const [categoriaSeleccionada, setCategoriaSeleccionada] = useState<string>("todas")
+  const [busquedaProducto, setBusquedaProducto] = useState<string>("")
+  const [categorias, setCategorias] = useState<string[]>([])
+
   useEffect(() => {
     if (open) {
       fetchTables()
       fetchProducts()
     }
   }, [open])
+
+  useEffect(() => {
+    // Extraer categorías únicas de los productos
+    const cats = Array.from(
+      new Set(products.map((p) => p.categories?.name).filter(Boolean))
+    )
+    setCategorias(cats)
+  }, [products])
 
   const fetchTables = async () => {
     try {
@@ -189,11 +202,9 @@ export function CreateOrderDialog({ open, onOpenChange }: CreateOrderDialogProps
 
   const calculateTotal = () => {
     const subtotal = orderItems.reduce((sum, item) => sum + item.total_price, 0)
-    const tax = subtotal * 0.19 // 19% IVA
     return {
       subtotal,
-      tax,
-      total: subtotal + tax,
+      total: subtotal,
     }
   }
 
@@ -218,7 +229,7 @@ export function CreateOrderDialog({ open, onOpenChange }: CreateOrderDialogProps
     }
 
     try {
-      const { subtotal, tax, total } = calculateTotal()
+      const { subtotal, total } = calculateTotal()
       const orderNumber = generateOrderNumber()
 
       // Get current user
@@ -242,7 +253,7 @@ export function CreateOrderDialog({ open, onOpenChange }: CreateOrderDialogProps
             customer_phone: customerPhone || null,
             customer_address: customerAddress || null,
             subtotal,
-            tax,
+            tax: 0, // eliminado
             discount: 0,
             total,
             notes: notes || null,
@@ -287,7 +298,6 @@ export function CreateOrderDialog({ open, onOpenChange }: CreateOrderDialogProps
       setNotes("")
       setOrderItems([])
       onOpenChange(false)
-      window.location.reload()
     } catch (error: any) {
       toast({
         title: "Error",
@@ -299,7 +309,15 @@ export function CreateOrderDialog({ open, onOpenChange }: CreateOrderDialogProps
     }
   }
 
-  const { subtotal, tax, total } = calculateTotal()
+  const { subtotal, total } = calculateTotal()
+
+  // 3. FILTRAR PRODUCTOS SEGÚN CATEGORÍA Y BÚSQUEDA
+  const productosFiltrados = products.filter((product) => {
+    const coincideCategoria =
+      categoriaSeleccionada === "todas" || product.categories?.name === categoriaSeleccionada
+    const coincideBusqueda = product.name.toLowerCase().includes(busquedaProducto.toLowerCase())
+    return coincideCategoria && coincideBusqueda
+  })
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -383,8 +401,30 @@ export function CreateOrderDialog({ open, onOpenChange }: CreateOrderDialogProps
             {/* Products Selection */}
             <div className="grid gap-4">
               <Label>Productos Disponibles</Label>
+              <div className="flex gap-2 mb-2">
+                <Select value={categoriaSeleccionada} onValueChange={setCategoriaSeleccionada}>
+                  <SelectTrigger className="w-48">
+                    <SelectValue placeholder="Todas las categorías" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todas">Todas las categorías</SelectItem>
+                    {categorias.map((cat) => (
+                      <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Input
+                  className="w-full"
+                  placeholder="Buscar producto..."
+                  value={busquedaProducto}
+                  onChange={e => setBusquedaProducto(e.target.value)}
+                />
+              </div>
               <div className="grid gap-2 max-h-40 overflow-y-auto">
-                {products.map((product) => (
+                {productosFiltrados.length === 0 && (
+                  <div className="text-center text-gray-400">No hay productos para mostrar</div>
+                )}
+                {productosFiltrados.map((product) => (
                   <Card
                     key={product.id}
                     className="cursor-pointer hover:bg-gray-50"
@@ -478,10 +518,7 @@ export function CreateOrderDialog({ open, onOpenChange }: CreateOrderDialogProps
                   <span>Subtotal:</span>
                   <span>{formatCurrency(subtotal)}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span>IVA (19%):</span>
-                  <span>{formatCurrency(tax)}</span>
-                </div>
+                {/* Eliminar la línea de IVA */}
                 <div className="flex justify-between font-semibold border-t pt-1">
                   <span>Total:</span>
                   <span>{formatCurrency(total)}</span>
